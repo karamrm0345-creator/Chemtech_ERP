@@ -52,7 +52,7 @@ export const REPORTS: ReportDef[] = [
         inv AS (SELECT to_char(date_trunc('month', date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Qatar'), 'YYYY-MM') m,
             SUM(subtotal * "exchangeRate") v FROM "SalesInvoice"
             WHERE status IN ('POSTED','PARTIALLY_PAID','PAID') ${range(p, "date")} ${cust} GROUP BY 1)
-        SELECT COALESCE(so.m, inv.m) month, COALESCE(so.c, 0)::int orders, COALESCE(so.v, 0)::float "orderIntake", COALESCE(inv.v, 0)::float revenue
+        SELECT COALESCE(so.m, inv.m) AS month, COALESCE(so.c, 0)::int orders, COALESCE(so.v, 0)::float "orderIntake", COALESCE(inv.v, 0)::float revenue
         FROM so FULL OUTER JOIN inv ON so.m = inv.m ORDER BY 1`;
       return {
         columns: [{ key: "month", label: "Month" }, { key: "orders", label: "Orders", type: "int" }, { key: "orderIntake", label: "Order intake (QAR)", type: "money" }, { key: "revenue", label: "Invoiced revenue (QAR)", type: "money" }],
@@ -113,7 +113,7 @@ export const REPORTS: ReportDef[] = [
     async run(p) {
       const cust = p.customerId ? Prisma.sql`AND "customerId" = ${p.customerId}` : Prisma.empty;
       const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
-        SELECT to_char(date_trunc('month', date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Qatar'), 'YYYY-MM') month,
+        SELECT to_char(date_trunc('month', date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Qatar'), 'YYYY-MM') AS month,
           COUNT(*) FILTER (WHERE status NOT IN ('DRAFT','CANCELLED','REVISED'))::int issued,
           COUNT(*) FILTER (WHERE status IN ('ACCEPTED','CONVERTED'))::int won,
           COUNT(*) FILTER (WHERE status = 'REJECTED')::int lost,

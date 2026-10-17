@@ -7,7 +7,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { AttachmentsPanel, HistoryPanel } from "@/components/panels";
 import { ActionButton } from "@/components/forms/action-button";
 import { selectQuoteAction } from "@/app/actions/purchasing";
-import { fmtDate, fmtMoney, fmtQty, fmtAmount, humanize } from "@/lib/format";
+import { fmtDate, fmtMoney, fmtQty, fmtAmount } from "@/lib/format";
 
 export default async function SqPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser("purchase.view");

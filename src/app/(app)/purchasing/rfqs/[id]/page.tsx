@@ -9,7 +9,7 @@ import { HistoryPanel, AttachmentsPanel } from "@/components/panels";
 import { ActionButton } from "@/components/forms/action-button";
 import { PrintButton } from "@/components/print-button";
 import { rfqActionAction, selectQuoteAction } from "@/app/actions/purchasing";
-import { fmtDate, fmtMoney, fmtQty, fmtAmount, humanize } from "@/lib/format";
+import { fmtDate, fmtMoney, fmtQty, fmtAmount } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export default async function RfqPage({ params }: { params: Promise<{ id: string }> }) {
