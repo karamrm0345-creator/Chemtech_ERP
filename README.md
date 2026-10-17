@@ -56,7 +56,17 @@ rules hold no matter which UI or API calls them.
 - Node.js 20+ (developed on 22)
 - PostgreSQL 14+ (developed on 16)
 
-## 3. Installation (development)
+## 3. Quick start with Docker (recommended for trying it)
+
+One command starts PostgreSQL and the app with demo data at http://localhost:3000.
+Step-by-step instructions, including Windows: [`docs/RUN_LOCALLY.md`](docs/RUN_LOCALLY.md).
+
+```bash
+printf 'DB_PASSWORD=choose-a-db-password\nDEMO_PASSWORD=ChooseDemo123\n' > .env
+docker compose up --build        # then sign in as gm@chemtech.demo with DEMO_PASSWORD
+```
+
+## 3b. Installation without Docker (development)
 
 ```bash
 git clone <repo> chemtech-erp && cd chemtech-erp

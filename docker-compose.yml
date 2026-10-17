@@ -1,0 +1,45 @@
+# One-command local install: PostgreSQL + Chemtech ERP.
+#   1. Create a file named .env next to this file with:
+#        DB_PASSWORD=choose-a-database-password
+#        DEMO_PASSWORD=ChooseDemo123      (login password for the demo users)
+#   2. docker compose up --build
+#   3. Open http://localhost:3000 and sign in as gm@chemtech.demo
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chemtech
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: chemtech_erp
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chemtech -d chemtech_erp"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://chemtech:${DB_PASSWORD}@db:5432/chemtech_erp?schema=public
+      UPLOAD_DIR: /data/uploads
+      # Plain HTTP on your own machine: allow the session cookie without HTTPS.
+      # Remove this line when you put the app behind HTTPS.
+      INSECURE_COOKIES: "1"
+      # 1 = load fictional demo data with one user per role; 0 = empty system (create the admin at /setup).
+      DEMO_SEED: ${DEMO_SEED:-1}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+    volumes:
+      - uploads:/data/uploads
+
+volumes:
+  dbdata:
+  uploads:
