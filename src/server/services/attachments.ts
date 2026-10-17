@@ -93,3 +93,36 @@ export async function deleteAttachment(ctx: Ctx, id: string) {
 export async function listAttachments(docType: string, docId: string) {
   return prisma.attachment.findMany({ where: { docType, docId }, orderBy: { createdAt: "desc" } });
 }
+
+const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+/** Uploads the company logo (PNG/JPEG/WebP; SVG is refused to avoid script injection). */
+export async function saveCompanyLogo(ctx: Ctx, file: File) {
+  requirePerm(ctx, "admin.settings");
+  if (!LOGO_TYPES.has(file.type)) throw new AppError("The logo must be a PNG, JPEG or WebP image.");
+  if (file.size > 2 * 1024 * 1024) throw new AppError("The logo may not exceed 2 MB.");
+  const a = await saveAttachment(ctx, "COMPANY", "1", file, "LOGO");
+  await withTx(async (tx) => {
+    await tx.companySettings.update({ where: { id: 1 }, data: { logoAttachmentId: a.id } });
+    await audit(tx, ctx, { action: "UPDATE", entity: "CompanySettings", entityId: "1", summary: `Company logo changed to ${a.fileName}` });
+  });
+  return a;
+}
+
+export async function clearCompanyLogo(ctx: Ctx) {
+  requirePerm(ctx, "admin.settings");
+  await withTx(async (tx) => {
+    await tx.companySettings.update({ where: { id: 1 }, data: { logoAttachmentId: null } });
+    await audit(tx, ctx, { action: "UPDATE", entity: "CompanySettings", entityId: "1", summary: "Company logo reset to default" });
+  });
+}
+
+/** Public read of the current logo file (logos are not confidential). */
+export async function readCompanyLogo() {
+  const s = await prisma.companySettings.findUnique({ where: { id: 1 } });
+  if (!s?.logoAttachmentId) return null;
+  const a = await prisma.attachment.findUnique({ where: { id: s.logoAttachmentId } });
+  if (!a || !LOGO_TYPES.has(a.mimeType)) return null;
+  const data = await fs.readFile(path.join(UPLOAD_DIR, path.basename(a.storedName))).catch(() => null);
+  return data ? { data, mimeType: a.mimeType, etag: a.sha256 } : null;
+}

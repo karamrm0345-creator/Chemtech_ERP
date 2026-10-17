@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 150" role="img" aria-label="ChemTech">
+  <!-- Recreated ChemTech mark: red hexagon (cube outline) with a check, wordmark with red T. -->
+  <g fill="none" stroke="#e3001b" stroke-linejoin="miter" stroke-linecap="square">
+    <path d="M140 6 L172 24.5 L172 61.5 L140 80 L108 61.5 L108 24.5 Z" stroke-width="10"/>
+    <path d="M123 41 L137 55 L160 30" stroke-width="10"/>
+  </g>
+  <text x="125" y="140" text-anchor="middle" font-family="'Arial Black','Helvetica Neue',Impact,Arial,sans-serif" font-weight="900" font-size="58" letter-spacing="-3" textLength="240" lengthAdjust="spacingAndGlyphs"><tspan fill="#111111">Chem</tspan><tspan fill="#e3001b">T</tspan><tspan fill="#111111">ech</tspan></text>
+</svg>

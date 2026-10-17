@@ -21,7 +21,8 @@ export async function CommercialDocument({
     <article className="card p-5 sm:p-8 print:border-0 print:p-0">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-brand-500 pb-4">
         <div className="flex items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-lg bg-brand-500 text-2xl font-black text-white">{s.companyName.charAt(0)}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/api/logo" alt={`${s.companyName} logo`} className="h-14 w-auto object-contain" />
           <div>
             <p className="text-lg font-extrabold">{s.legalName || s.companyName}</p>
             <p className="text-xs text-ink-soft">{[s.address, s.phone, s.email].filter(Boolean).join(" · ")}</p>

@@ -11,7 +11,7 @@ export function AuthLayout({ company, title, children }: { company: string; titl
     <div className="flex min-h-screen flex-col bg-white lg:flex-row">
       <div className="flex w-full items-center justify-center px-5 py-10 lg:w-[480px] lg:shrink-0 lg:border-r lg:border-line lg:shadow-[4px_0_20px_rgba(16,33,58,0.06)]">
         <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden"><Logo name={company} /></div>
+          <div className="mb-8 lg:hidden"><Logo name={company} size="lg" /></div>
           <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{title}</h1>
           {children}
         </div>
@@ -19,7 +19,7 @@ export function AuthLayout({ company, title, children }: { company: string; titl
       <div className="relative hidden flex-1 overflow-hidden bg-panel lg:flex lg:flex-col lg:justify-center lg:px-16">
         <div aria-hidden className="absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full border-[90px] border-white/60" />
         <div className="relative max-w-xl">
-          <div className="mb-10 scale-125 origin-left"><Logo name={company} /></div>
+          <div className="mb-10"><Logo name={company} size="lg" /></div>
           <p className="text-2xl font-extrabold leading-snug text-ink">Everything you need to run your operations in one integrated system.</p>
           <p className="mt-3 text-base text-ink-soft">Sales, procurement, store and inventory, customers and suppliers on one shared database, with live management dashboards.</p>
           <ul className="mt-12 grid grid-cols-2 gap-x-8 gap-y-4">

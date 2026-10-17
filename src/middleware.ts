@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Cheap edge check: no session cookie → login. Full validation (DB session,
 // expiry, active user, permissions) happens server-side on every request.
-const PUBLIC = ["/login", "/setup", "/_next", "/favicon", "/icon"];
+const PUBLIC = ["/login", "/setup", "/_next", "/favicon", "/icon", "/api/logo", "/chemtech-logo.svg"];
 
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;

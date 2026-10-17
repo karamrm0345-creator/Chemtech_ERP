@@ -2,7 +2,7 @@ import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { PageHeader, Card } from "@/components/ui/primitives";
 import { AttachmentsPanel } from "@/components/panels";
-import { SettingsForm, SequenceRow, CurrencyEditor, CriteriaEditor } from "./forms";
+import { SettingsForm, SequenceRow, CurrencyEditor, CriteriaEditor, LogoEditor } from "./forms";
 
 export const metadata = { title: "Company settings" };
 
@@ -20,7 +20,8 @@ export default async function SettingsPage() {
       <PageHeader title="Company settings" subtitle="Company profile, business rules, document numbering, currencies and supplier evaluation criteria." crumbs={[{ label: "Administration" }, { label: "Settings" }]} />
       <div className="space-y-4">
         <SettingsForm initial={{ ...s, defaultTaxRate: s.defaultTaxRate.toString(), grnTolerancePct: s.grnTolerancePct.toString(), adjustmentAlertQty: s.adjustmentAlertQty.toString() }} currencies={currencies.map((c) => c.code)} />
-        <AttachmentsPanel user={user} docType="COMPANY" docId="1" title="Company logo & documents" />
+        <LogoEditor custom={!!s.logoAttachmentId} />
+        <AttachmentsPanel user={user} docType="COMPANY" docId="1" title="Company documents" />
         <Card title="Document numbering" bodyClass="p-0">
           <div className="overflow-x-auto">
             <table className="table-base">

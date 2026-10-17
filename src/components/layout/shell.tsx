@@ -7,15 +7,12 @@ import { Menu, X, LogOut, KeyRound, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { NavGroup } from "./nav";
 
-export function Logo({ name, light }: { name: string; light?: boolean }) {
-  return (
-    <span className="flex items-center gap-2.5">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-500 text-lg font-black text-white shadow-sm" aria-hidden>
-        {name.charAt(0).toUpperCase()}
-      </span>
-      <span className={cn("text-lg font-extrabold tracking-tight", light ? "text-white" : "text-ink")}>{name}</span>
-    </span>
-  );
+/** Company logo (uploaded in settings, or the bundled ChemTech logo). */
+export function Logo({ name, light, size = "md" }: { name: string; light?: boolean; size?: "sm" | "md" | "lg" }) {
+  const h = { sm: "h-9", md: "h-12", lg: "h-24" }[size];
+  // eslint-disable-next-line @next/next/no-img-element
+  const img = <img src="/api/logo" alt={`${name} logo`} className={cn(h, "w-auto object-contain")} />;
+  return light ? <span className="inline-flex items-center rounded-md bg-white px-2 py-1 shadow-sm">{img}</span> : img;
 }
 
 export function Shell({ nav, user, company, logoutAction, children }: {
@@ -29,8 +26,8 @@ export function Shell({ nav, user, company, logoutAction, children }: {
 
   const sidebar = (
     <nav className="flex h-full flex-col bg-sidebar text-slate-300">
-      <div className="flex h-16 items-center justify-between px-4">
-        <Link href="/"><Logo name={company} light /></Link>
+      <div className="flex h-24 items-center justify-between px-4">
+        <Link href="/" aria-label={`${company} home`}><Logo name={company} light size="md" /></Link>
         <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu"><X className="h-5 w-5" /></button>
       </div>
       <div className="flex-1 space-y-5 overflow-y-auto px-3 pb-6 pt-2">
@@ -69,7 +66,7 @@ export function Shell({ nav, user, company, logoutAction, children }: {
       <header className="no-print sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-line bg-white/95 px-4 backdrop-blur sm:px-6">
         <div className="flex items-center gap-3">
           <button className="rounded-md p-2 hover:bg-panel lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></button>
-          <div className="lg:hidden"><Logo name={company} /></div>
+          <div className="lg:hidden"><Logo name={company} size="sm" /></div>
           <p className="hidden text-sm text-ink-soft lg:block"><span className="font-semibold text-ink">{company}</span> · Integrated ERP · Qatar</p>
         </div>
         <div className="relative">

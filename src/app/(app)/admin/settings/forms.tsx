@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { saveSettingsAction, saveSequenceAction, saveCurrencyAction, saveCriterionAction } from "@/app/actions/admin";
+import { saveSettingsAction, saveSequenceAction, saveCurrencyAction, saveCriterionAction, uploadLogoAction, resetLogoAction } from "@/app/actions/admin";
+import { useRef } from "react";
 import { useAction } from "@/components/forms/use-action";
 import { Field, Check, Select } from "@/components/forms/fields";
 import { btn, Card } from "@/components/ui/primitives";
@@ -118,6 +119,36 @@ export function CriteriaEditor({ criteria }: { criteria: { id: string; name: str
           </tr>
         </tbody>
       </table>
+    </Card>
+  );
+}
+
+export function LogoEditor({ custom }: { custom: boolean }) {
+  const { run, pending } = useAction();
+  const input = useRef<HTMLInputElement>(null);
+  const [v, setV] = useState(0);
+  return (
+    <Card title="Company logo">
+      <div className="flex flex-wrap items-center gap-6">
+        <div className="grid h-28 w-56 place-items-center rounded-md border border-line bg-white p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/logo?v=${v}`} alt="Company logo" className="max-h-24 w-auto object-contain" />
+        </div>
+        <div className="space-y-2 text-sm">
+          <p className="text-ink-soft">Shown in the sidebar, sign-in page and on printed quotations, orders, delivery notes and invoices.<br />PNG, JPEG or WebP, max 2 MB. A transparent PNG works best.</p>
+          <p className="text-xs text-ink-muted">{custom ? "Using your uploaded logo." : "Using the built-in ChemTech logo."}</p>
+          <div className="flex gap-2">
+            <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={async (e) => {
+              const f = e.target.files?.[0]; if (!f) return;
+              const fd = new FormData(); fd.set("file", f);
+              if (await run(() => uploadLogoAction(fd))) setV(Date.now());
+              if (input.current) input.current.value = "";
+            }} />
+            <button type="button" className={btn("primary")} disabled={pending} onClick={() => input.current?.click()}>Upload logo</button>
+            {custom && <button type="button" className={btn("outline")} disabled={pending} onClick={async () => { if (await run(() => resetLogoAction())) setV(Date.now()); }}>Reset to default</button>}
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }

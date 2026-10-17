@@ -32,3 +32,17 @@ export async function uploadAttachmentAction(form: FormData) {
 export async function deleteAttachmentAction(id: string) {
   return runAction((u) => deleteAttachment(u, id), { message: "Attachment deleted" });
 }
+export async function uploadLogoAction(form: FormData) {
+  return runAction(async (u) => {
+    const file = form.get("file");
+    if (!(file instanceof File)) throw new Error("No file");
+    const { saveCompanyLogo } = await import("@/server/services/attachments");
+    await saveCompanyLogo(u, file);
+  }, { revalidate: ["/"], message: "Logo updated" });
+}
+export async function resetLogoAction() {
+  return runAction(async (u) => {
+    const { clearCompanyLogo } = await import("@/server/services/attachments");
+    await clearCompanyLogo(u);
+  }, { revalidate: ["/"], message: "Logo reset to default" });
+}
