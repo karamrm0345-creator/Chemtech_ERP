@@ -43,7 +43,7 @@ for (const p of P) {
   try { status = (await page.goto(B + p, { waitUntil: "load" }))?.status() ?? 0; } catch { await page.waitForLoadState("load").catch(() => {}); }
   const body = (await page.innerText("body").catch(() => "")) ?? "";
   const where = page.url().replace(B, "");
-  if (where.startsWith("/forbidden")) { forbidden++; continue; }
+  if (where.startsWith("/forbidden") || body.includes("Access restricted")) { forbidden++; if (process.env.SHOW_FORBIDDEN) console.log("forbidden", p); continue; }
   if (status >= 400 || /Something went wrong|Application error|Unhandled Runtime Error|Record not found/.test(body) || errs.length) {
     bad++; console.log("PROBLEM", status, p, "->", where, errs.join(" | "));
   } else ok++;

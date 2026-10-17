@@ -11,7 +11,7 @@ async function login(page: Page, email: string) {
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 }
 
-async function pick(page: Page, trigger: string, search: string) {
+async function pick(page: Page, trigger: string | RegExp, search: string) {
   await page.getByRole("button", { name: trigger }).first().click();
   await page.getByPlaceholder("Type to search…").fill(search);
   await page.locator("ul button").filter({ hasText: search }).first().click();
@@ -28,11 +28,11 @@ test("sales order: officer prepares, manager approves, storekeeper delivers, sto
   // 1. Sales officer creates and submits an order
   await login(page, "sales.officer@chemtech.demo");
   await page.goto("/sales/orders/new");
-  await pick(page, "Select customer", "Lusail Trading");
+  await pick(page, /^Customer/, "Lusail Trading");
   await pick(page, "Item (optional)", "DEMO-CON-001");
   await page.locator("tbody tr").first().locator("input").nth(1).fill("2"); // quantity
   await page.getByRole("button", { name: /Save sales order/ }).click();
-  await page.waitForURL(/\/sales\/orders\/[a-z0-9]+$/);
+  await page.waitForURL(/\/sales\/orders\/c[a-z0-9]{20,}$/);
   const orderUrl = page.url();
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByText("Submitted", { exact: true }).first()).toBeVisible();
@@ -51,7 +51,7 @@ test("sales order: officer prepares, manager approves, storekeeper delivers, sto
   await page.goto(orderUrl);
   await page.getByRole("link", { name: "Create delivery" }).click();
   await page.getByRole("button", { name: "Create draft delivery" }).click();
-  await page.waitForURL(/\/sales\/deliveries\/[a-z0-9]+$/);
+  await page.waitForURL(/\/sales\/deliveries\/c[a-z0-9]{20,}$/);
   await page.getByRole("button", { name: /Post delivery/ }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByText(/Posted .* Stock issued/)).toBeVisible();

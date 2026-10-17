@@ -2,18 +2,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import * as Icons from "lucide-react";
-import { Menu, X, LogOut, KeyRound, ChevronDown } from "lucide-react";
+import {
+  Menu, X, LogOut, KeyRound, ChevronDown, Circle, LayoutDashboard, BadgeCheck, FileText, ShoppingCart, Truck, Building2, ClipboardList, Scale,
+  PackageCheck, PackageOpen, Factory, Boxes, Warehouse, ArrowLeftRight, ListChecks, BookOpen, TriangleAlert, ScanBarcode, Settings2, Receipt,
+  FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History, type LucideIcon,
+} from "lucide-react";
+import { Logo } from "./logo";
+
+const ICONS: Record<string, LucideIcon> = {
+  LayoutDashboard, BadgeCheck, FileText, ShoppingCart, Truck, Building2, ClipboardList, Scale, PackageCheck, PackageOpen, Factory, Boxes, Warehouse,
+  ArrowLeftRight, ListChecks, BookOpen, TriangleAlert, ScanBarcode, Settings2, Receipt, FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History,
+};
 import { cn } from "@/lib/cn";
 import type { NavGroup } from "./nav";
 
-/** Company logo (uploaded in settings, or the bundled ChemTech logo). */
-export function Logo({ name, light, size = "md" }: { name: string; light?: boolean; size?: "sm" | "md" | "lg" }) {
-  const h = { sm: "h-9", md: "h-12", lg: "h-24" }[size];
-  // eslint-disable-next-line @next/next/no-img-element
-  const img = <img src="/api/logo" alt={`${name} logo`} className={cn(h, "w-auto object-contain")} />;
-  return light ? <span className="inline-flex items-center rounded-md bg-white px-2 py-1 shadow-sm">{img}</span> : img;
-}
+export { Logo };
 
 export function Shell({ nav, user, company, logoutAction, children }: {
   nav: NavGroup[]; user: { name: string; email: string; role: string }; company: string;
@@ -36,7 +39,7 @@ export function Shell({ nav, user, company, logoutAction, children }: {
             <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{g.label}</p>
             <ul className="space-y-0.5">
               {g.items.map((i) => {
-                const Icon = (Icons as unknown as Record<string, Icons.LucideIcon>)[i.icon] ?? Icons.Circle;
+                const Icon = ICONS[i.icon] ?? Circle;
                 const active = pathname === i.href || pathname.startsWith(i.href + "/");
                 return (
                   <li key={i.href}>

@@ -4,6 +4,7 @@ import { getSessionUser } from "@/server/auth/session";
 import { AuthLayout } from "../auth-layout";
 import { LoginForm } from "./form";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {

@@ -1,4 +1,4 @@
-import { Logo } from "@/components/layout/shell";
+import { Logo } from "@/components/layout/logo";
 
 const FEATURES = [
   "Sales & quotations", "Procurement", "Store & inventory", "Customer management",

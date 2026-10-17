@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { AuthLayout } from "../auth-layout";
 import { SetupForm } from "./form";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "First-time setup" };
 
 export default async function SetupPage() {
