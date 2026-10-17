@@ -57,9 +57,11 @@ export function maskSupplier<T extends Partial<Supplier>>(ctx: Ctx, s: T): T {
 }
 
 function stripBank(ctx: Ctx, data: z.infer<typeof supplierSchema>) {
-  if (can(ctx, "supplier.bank.manage")) return data;
   const copy: Record<string, unknown> = { ...data };
-  for (const f of BANK_FIELDS) delete copy[f];
+  for (const f of BANK_FIELDS) {
+    // Never persist the mask placeholder; drop all bank fields without edit rights.
+    if (!can(ctx, "supplier.bank.manage") || copy[f] === "••••••") delete copy[f];
+  }
   return copy as typeof data;
 }
 

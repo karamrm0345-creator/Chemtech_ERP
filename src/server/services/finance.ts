@@ -187,7 +187,8 @@ export async function createPurchaseInvoice(ctx: Ctx, raw: unknown) {
   });
 }
 
-export async function postPurchaseInvoice(ctx: Ctx, id: string, acceptVariance = false) {
+export async function postPurchaseInvoice(ctx: Ctx, id: string, varianceJustification?: string) {
+  const acceptVariance = !!varianceJustification?.trim();
   requirePerm(ctx, "finance.purchase.manage");
   return withTx(async (tx) => {
     await lockRow(tx, "PurchaseInvoice", id);
@@ -200,7 +201,7 @@ export async function postPurchaseInvoice(ctx: Ctx, id: string, acceptVariance =
       await tx.purchaseOrderLine.update({ where: { id: pol.id }, data: { invoicedQty: D(pol.invoicedQty).add(D(l.quantity)) } });
     }
     await tx.purchaseInvoice.update({ where: { id }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date() } });
-    await audit(tx, ctx, { action: "POST", entity: "PurchaseInvoice", entityId: id, summary: `Posted supplier invoice ${inv.number}${inv.matchStatus === "VARIANCE" ? " with accepted variance" : ""}` });
+    await audit(tx, ctx, { action: "POST", entity: "PurchaseInvoice", entityId: id, summary: `Posted supplier invoice ${inv.number}${inv.matchStatus === "VARIANCE" ? ` with accepted variance — ${varianceJustification}` : ""}` });
   });
 }
 

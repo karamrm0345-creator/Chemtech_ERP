@@ -103,8 +103,9 @@ export async function listItems(ctx: Ctx, a: ListArgs & { categoryId?: string; i
     const onHand = bm.get(r.id) ?? ZERO;
     const reserved = rm.get(r.id) ?? ZERO;
     const stocked = r.inventoryClass !== "NON_STOCK";
-    const status = !stocked ? "NON_STOCK" : onHand.lte(0) ? "OUT" : onHand.lte(r.minStockLevel) ? "LOW" : "OK";
-    return { ...r, onHand, reserved, available: onHand.sub(reserved), stockStatus: status as "NON_STOCK" | "OUT" | "LOW" | "OK" };
+    const hasMin = D(r.minStockLevel).gt(0);
+    const status = !stocked ? "NON_STOCK" : onHand.lte(0) ? (hasMin ? "OUT" : "NONE") : hasMin && onHand.lte(r.minStockLevel) ? "LOW" : "OK";
+    return { ...r, onHand, reserved, available: onHand.sub(reserved), stockStatus: status as "NON_STOCK" | "OUT" | "NONE" | "LOW" | "OK" };
   });
   let total: number;
   if (all) {
