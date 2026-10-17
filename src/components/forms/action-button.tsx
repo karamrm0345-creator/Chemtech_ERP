@@ -33,7 +33,8 @@ export function ActionButton({
       redirect: redirectBase ? (d) => ((d as { id?: string })?.id ? `${redirectBase}/${(d as { id: string }).id}` : undefined)
         : typeof redirectTo === "function" ? redirectTo : redirectTo ? () => redirectTo : undefined,
     });
-    if (r) { setOpen(false); setComment(""); }
+    // Close on success; on error keep the dialog only when it holds typed input (a comment prompt).
+    if (r) { setOpen(false); setComment(""); } else if (!prompt) setOpen(false);
   };
   return (
     <>
