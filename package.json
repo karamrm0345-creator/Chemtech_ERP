@@ -14,7 +14,8 @@
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:smoke": "node scripts/crawl-pages.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed-base.ts"

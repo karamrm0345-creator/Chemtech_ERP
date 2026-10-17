@@ -142,6 +142,12 @@ NODE_ENV=production npm start # behind HTTPS reverse proxy (nginx/Caddy), port 3
 
 Then create the first administrator via `/setup` or `npm run admin:create`. **Never run the demo seed in production.**
 
+### Company logo
+
+A ChemTech logo (vector re-creation) ships as the default at `public/chemtech-logo.svg`. To use the official
+artwork, go to **Administration → Company settings → Company logo** and upload a PNG, JPEG or WebP (≤ 2 MB). It is then used in the
+sidebar, on the sign-in page and on all printed documents (served from `/api/logo`).
+
 ## 7. Database: migrations, backup, restore
 
 - Schema: `prisma/schema.prisma`; migrations: `prisma/migrations/*` (plain SQL, reviewed into git).

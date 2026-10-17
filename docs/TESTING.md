@@ -68,4 +68,16 @@ node scripts/crawl-pages.mjs gm@chemtech.demo '<password>'
 ## Responsive check
 
 Pages were rendered at desktop (1280–1440 px) and phone width (390 px) with Playwright and
-inspected. The sidebar collapses into a drawer and tables scroll horizontally on small screens.
+inspected. The sidebar collapses into a drawer, KPI cards and charts stack, and tables scroll horizontally on small screens.
+
+## Latest browser results (2026-10-17, demo data)
+
+| Run | Result |
+|---|---|
+| Page crawl, dev server: General Manager | 106 pages, 0 problems (pages outside the role correctly refused) |
+| Page crawl, dev server: System Administrator | 106 pages, 0 problems |
+| Page crawl, dev server: Storekeeper | 106 pages, 0 problems |
+| Page crawl, **production build**: General Manager | 106 pages, 0 problems |
+| Page crawl, **production build**: Sales Officer | 106 pages, 0 problems |
+| Playwright e2e, dev and production builds | 2 passed |
+| `npm run build` / `tsc --noEmit` / `eslint` | clean |
