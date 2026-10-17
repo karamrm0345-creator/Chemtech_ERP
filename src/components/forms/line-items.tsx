@@ -98,3 +98,19 @@ export function LineItemsEditor({ lines, onChange, priceField = "sellingPrice", 
     </div>
   );
 }
+
+export const hasPrices = (lines: LineState[]) => lines.some((l) => Number(l.unitPrice) > 0);
+
+/**
+ * Shown when the document currency differs from the party's usual currency
+ * while prices are already entered: prices are never converted silently.
+ */
+export function CurrencyWarning({ party, partyCurrency, currency, show }: { party?: string; partyCurrency?: string; currency: string; show: boolean }) {
+  if (!show || !partyCurrency || partyCurrency === currency) return null;
+  return (
+    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      {party ?? "This party"} usually trades in <b>{partyCurrency}</b>, but this document is in <b>{currency}</b>. Line prices are <b>not</b> converted automatically,
+      so check that every unit price is in {currency} before saving, or change the currency and re-enter the prices.
+    </p>
+  );
+}

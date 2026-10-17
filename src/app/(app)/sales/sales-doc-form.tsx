@@ -5,7 +5,7 @@ import { saveQuotationAction, saveSalesOrderAction } from "@/app/actions/sales";
 import { useAction } from "@/components/forms/use-action";
 import { Field, Select, FormActions } from "@/components/forms/fields";
 import { EntityPicker } from "@/components/forms/entity-picker";
-import { LineItemsEditor, newLine, type LineState } from "@/components/forms/line-items";
+import { LineItemsEditor, newLine, hasPrices, CurrencyWarning, type LineState } from "@/components/forms/line-items";
 import { btn, Card } from "@/components/ui/primitives";
 
 export interface SalesDocInitial {
@@ -23,6 +23,7 @@ export function SalesDocForm({ kind, id, initial, currencies, warehouses, defaul
   const { run, pending } = useAction();
   const [h, setH] = useState({ ...initial, lines: undefined });
   const [lines, setLines] = useState<LineState[]>(initial.lines.length ? initial.lines : [newLine(defaultTax)]);
+  const [partyCurrency, setPartyCurrency] = useState<string | undefined>();
   const [contacts, setContacts] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     if (!h.customerId) { setContacts([]); return; }
@@ -40,7 +41,11 @@ export function SalesDocForm({ kind, id, initial, currencies, warehouses, defaul
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Customer" required className="lg:col-span-2">
             <EntityPicker entity="customers" value={h.customerId} initialLabel={h.customerLabel} placeholder="Select customer"
-              onChange={(o) => setH({ ...h, customerId: o?.id ?? null, customerLabel: o?.label, contactId: "", currency: String(o?.data?.currency ?? h.currency), paymentTerms: h.paymentTerms || String(o?.data?.paymentTerms ?? ""), shippingAddress: h.shippingAddress || String(o?.data?.address ?? "") })} />
+              onChange={(o) => {
+                const custCur = o?.data?.currency ? String(o.data.currency) : undefined;
+                setPartyCurrency(custCur);
+                setH({ ...h, customerId: o?.id ?? null, customerLabel: o?.label, contactId: "", currency: custCur && !hasPrices(lines) ? custCur : h.currency, paymentTerms: h.paymentTerms || String(o?.data?.paymentTerms ?? ""), shippingAddress: h.shippingAddress || String(o?.data?.address ?? "") });
+              }} />
           </Field>
           <Field label="Contact"><Select value={h.contactId ?? ""} onChange={(v) => setH({ ...h, contactId: v })} options={contacts.map((c) => ({ value: c.id, label: c.label }))} placeholder="—" /></Field>
           <Field label="Date"><input type="date" className="input" {...s("date")} /></Field>
@@ -62,6 +67,7 @@ export function SalesDocForm({ kind, id, initial, currencies, warehouses, defaul
           {kind === "order" && <Field label="Shipping address" className="sm:col-span-2"><input className="input" {...s("shippingAddress")} /></Field>}
         </div>
       </Card>
+      <CurrencyWarning party={h.customerLabel} partyCurrency={partyCurrency} currency={h.currency} show={hasPrices(lines)} />
       <Card title="Items & services">
         <LineItemsEditor lines={lines} onChange={setLines} currency={h.currency} defaultTax={defaultTax} />
       </Card>

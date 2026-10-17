@@ -160,7 +160,7 @@ export async function convertQuotationToOrder(ctx: Ctx, id: string, warehouseId:
       data: {
         number, customerId: q.customerId, contactId: q.contactId, quotationId: q.id, currency: q.currency, exchangeRate: q.exchangeRate,
         paymentTerms: q.paymentTerms, deliveryTerms: q.deliveryTerms, notes: q.notes, warehouseId, createdById: ctx.userId,
-        subtotal: q.subtotal, discountTotal: q.discountTotal, taxTotal: q.taxTotal, total: q.total, customerPoRef: q.reference,
+        subtotal: q.subtotal, discountTotal: q.discountTotal, taxTotal: q.taxTotal, total: q.total,
         lines: { create: q.lines.map((l) => ({
           lineNo: l.lineNo, itemId: l.itemId, description: l.description, quantity: l.quantity, uom: l.uom, unitPrice: l.unitPrice,
           discountPct: l.discountPct, taxRate: l.taxRate, lineTotal: l.lineTotal, taxAmount: l.taxAmount,

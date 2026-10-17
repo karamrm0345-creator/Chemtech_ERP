@@ -5,7 +5,7 @@ import { savePoAction } from "@/app/actions/purchasing";
 import { useAction } from "@/components/forms/use-action";
 import { Field, Select, Check, FormActions } from "@/components/forms/fields";
 import { EntityPicker } from "@/components/forms/entity-picker";
-import { LineItemsEditor, newLine, type LineState } from "@/components/forms/line-items";
+import { LineItemsEditor, newLine, hasPrices, CurrencyWarning, type LineState } from "@/components/forms/line-items";
 import { btn, Card, Notice } from "@/components/ui/primitives";
 
 export interface PoInitial {
@@ -19,6 +19,7 @@ export function PoForm({ id, initial, currencies, warehouses, defaultTax }: { id
   const { run, pending } = useAction();
   const [h, setH] = useState({ ...initial, lines: undefined });
   const [lines, setLines] = useState<LineState[]>(initial.lines.length ? initial.lines : [newLine(defaultTax)]);
+  const [partyCurrency, setPartyCurrency] = useState<string | undefined>();
   const t = (k: keyof typeof h) => ({ value: (h[k] as string) ?? "", onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setH({ ...h, [k]: e.target.value }) });
   return (
     <form className="space-y-4" onSubmit={async (e) => {
@@ -30,7 +31,12 @@ export function PoForm({ id, initial, currencies, warehouses, defaultTax }: { id
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Supplier" required className="lg:col-span-2">
             <EntityPicker entity="suppliers" value={h.supplierId} initialLabel={h.supplierLabel} disabled={!!initial.supplierQuotationId}
-              onChange={(o) => setH({ ...h, supplierId: o?.id ?? null, supplierLabel: o?.label, currency: String(o?.data?.currency ?? h.currency), paymentTerms: h.paymentTerms || String(o?.data?.paymentTerms ?? "") })} />
+              onChange={(o) => {
+                const supCur = o?.data?.currency ? String(o.data.currency) : undefined;
+                setPartyCurrency(supCur);
+                // Only adopt the supplier's currency while no prices are entered; never reinterpret existing prices.
+                setH({ ...h, supplierId: o?.id ?? null, supplierLabel: o?.label, currency: supCur && !hasPrices(lines) ? supCur : h.currency, paymentTerms: h.paymentTerms || String(o?.data?.paymentTerms ?? "") });
+              }} />
           </Field>
           <Field label="Supplier quotation ref."><input className="input" {...t("supplierQuoteRef")} /></Field>
           <Field label="Order date"><input type="date" className="input" {...t("date")} /></Field>
@@ -44,6 +50,7 @@ export function PoForm({ id, initial, currencies, warehouses, defaultTax }: { id
           <div className="sm:col-span-2 lg:col-span-4"><Check label="Partial deliveries allowed" hint="When off, a goods receipt must complete the order unless a procurement approver authorises an exception." checked={h.allowPartial} onChange={(v) => setH({ ...h, allowPartial: v })} /></div>
         </div>
       </Card>
+      <CurrencyWarning party={h.supplierLabel} partyCurrency={partyCurrency} currency={h.currency} show={hasPrices(lines)} />
       <Card title="Order lines">
         <LineItemsEditor lines={lines} onChange={setLines} priceField="purchasePrice" currency={h.currency} defaultTax={defaultTax} extraCharges={Number(h.freight || 0) + Number(h.otherCharges || 0)} />
         <p className="mt-2 text-xs text-ink-muted">Freight and other charges are allocated to stocked lines by value to compute landed cost at goods receipt.</p>
