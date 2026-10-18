@@ -12,5 +12,5 @@ RUN npx prisma generate && npm run build
 
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
-RUN chmod +x docker/entrypoint.sh
-CMD ["docker/entrypoint.sh"]
+RUN sed -i "s/\r$//" docker/entrypoint.sh && chmod +x docker/entrypoint.sh
+CMD ["sh", "docker/entrypoint.sh"]

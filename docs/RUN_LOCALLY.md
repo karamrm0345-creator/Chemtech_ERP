@@ -83,3 +83,9 @@ where you create your company administrator.
 - **"DEMO_SEED=1 needs DEMO_PASSWORD"**: add `DEMO_PASSWORD=…` to `.env`.
 - **Port 3000 is already in use**: change `"3000:3000"` to `"3001:3000"` in `docker-compose.yml` and open http://localhost:3001.
 - **Sign-in seems to do nothing**: use `http://localhost:3000` exactly. The cookie setting for plain HTTP is meant for your own machine. For a server shared with colleagues, follow [DEPLOYMENT.md](DEPLOYMENT.md) and use HTTPS.
+- **"This site can't be reached"**:
+  1. Make sure Docker Desktop is open and running, and that `docker compose up --build` is still running in its window.
+  2. Wait for the line `▶ Chemtech ERP is starting on http://localhost:3000`. The first build can take 5–10 minutes.
+  3. Open the address on the **same computer** that runs Docker, not on a phone or another PC.
+  4. Run `docker compose ps`. If `app` is not `running`, run `docker compose logs app` to see why.
+  5. If the log shows `set: Illegal option -` or `entrypoint.sh: not found`, your copy has Windows line endings. Get the latest code (`git pull`) and run `docker compose up --build` again.
