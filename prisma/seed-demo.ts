@@ -21,11 +21,12 @@ import * as Sales from "../src/server/services/sales";
 import * as Pur from "../src/server/services/purchasing";
 import * as Fin from "../src/server/services/finance";
 
-if (process.env.NODE_ENV === "production") throw new Error("Demo seed is disabled in production.");
-if (process.env.ALLOW_DEMO_SEED !== "1") throw new Error("Set ALLOW_DEMO_SEED=1 to confirm you want fictional demo data in this database.");
+function refuse(msg: string): never { console.error(`✖ ${msg}`); process.exit(1); }
+if (process.env.NODE_ENV === "production") refuse("Demo seed is disabled in production.");
+if (process.env.ALLOW_DEMO_SEED !== "1") refuse("Set ALLOW_DEMO_SEED=1 to confirm you want fictional demo data in this database.");
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
 const pwProblem = passwordProblem(DEMO_PASSWORD);
-if (pwProblem) throw new Error(`DEMO_PASSWORD invalid: ${pwProblem}`);
+if (pwProblem) refuse(`DEMO_PASSWORD invalid: ${pwProblem}`);
 
 const prisma = new PrismaClient();
 const DAY = 86_400_000;
