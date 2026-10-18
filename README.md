@@ -60,6 +60,7 @@ rules hold no matter which UI or API calls them.
 
 One command starts PostgreSQL and the app with demo data at http://localhost:3000.
 Step-by-step instructions, including Windows: [`docs/RUN_LOCALLY.md`](docs/RUN_LOCALLY.md).
+To try it online for free without installing anything: [`docs/TEST_ON_RENDER.md`](docs/TEST_ON_RENDER.md).
 
 ```bash
 printf 'DB_PASSWORD=choose-a-db-password\nDEMO_PASSWORD=ChooseDemo123\n' > .env

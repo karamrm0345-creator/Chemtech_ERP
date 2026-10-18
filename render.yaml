@@ -1,0 +1,28 @@
+# Render.com Blueprint for a TEST deployment with fictional demo data.
+# Free plan: the database expires after 30 days and uploaded files are lost on restart.
+# For real company use, follow docs/DEPLOYMENT.md on a paid server instead.
+databases:
+  - name: chemtech-db
+    plan: free
+    databaseName: chemtech_erp
+    user: chemtech
+
+services:
+  - type: web
+    name: chemtech-erp
+    runtime: docker
+    plan: free
+    healthCheckPath: /login
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chemtech-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: /app/storage/uploads
+      - key: DEMO_SEED
+        value: "1"
+      - key: DEMO_PASSWORD
+        sync: false   # Render asks you for this when you create the Blueprint
