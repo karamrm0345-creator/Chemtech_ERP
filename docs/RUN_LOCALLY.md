@@ -77,6 +77,16 @@ To begin with an empty system for real use, set `DEMO_SEED=0` in `.env` before t
 (or after `docker compose down -v`). Opening http://localhost:3000 then shows the one-time setup page
 where you create your company administrator.
 
+## Windows without Docker
+
+If Docker cannot be installed (for example the Docker website shows "Error 1009"):
+
+1. Install **Node.js LTS** from https://nodejs.org (default options).
+2. Install **PostgreSQL 16** from https://www.postgresql.org/download/windows/ and write down the password you choose for the `postgres` user.
+3. Restart the PC, then in the `Chemtech_ERP` folder run `git pull` and **double-click `start-windows.bat`**.
+4. The first time it asks for the `postgres` password and a demo password, then installs, builds (about 10 minutes) and opens http://localhost:3000.
+   Sign in as `gm@chemtech.demo` with your demo password. Next time, double-click the same file; after `git pull`, run `start-windows.bat -Rebuild`.
+
 ## Troubleshooting
 
 - **"Set DB_PASSWORD in .env"**: the `.env` file is missing or not in the `chemtech-erp` folder.
