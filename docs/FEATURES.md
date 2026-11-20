@@ -56,6 +56,12 @@
 - Withholding tax on supplier payments (rate per supplier, editable per payment): the bank pays the net, the withheld amount goes to *Withholding tax payable*.
 - Tax codes map each rate to its output and input tax accounts; cost centres on sales and supplier invoices and journal lines, with profit & loss and ledger filtered by cost centre.
 - Reports: customer aging and supplier aging (by days past due, with unallocated credits) and tax summary (output and input tax by rate, net of notes). Revenue figures on the dashboard and sales reports are net of credit notes.
+- Refunds: pay back unused customer credit (advance or credit note) or record money a supplier returns; the refunded amount is used up on its source document.
+- Period-end foreign-currency revaluation: open foreign-currency receivables, payables and unapplied credits restated at the closing rate (preview first), posted to *Unrealised exchange differences* and reversed automatically the next day.
+- Fixed assets: categories with their ledger accounts, asset register (cost, salvage, useful life, depreciation already charged before go-live, serial, location, cost centre), capitalisation against a chosen funding account, monthly straight-line depreciation run (catches up missed months, never charges a month twice, stops at salvage value), disposal with proceeds and gain or loss.
+- Budgets per fiscal year and optionally per cost centre: annual amounts per income / expense account spread over the months, budget versus actual for any range of months with favourable / unfavourable variances.
+- Bank reconciliation: CSV statement import (Date, Description, Reference, Amount or Debit / Credit; opening + lines must equal closing), automatic matching by amount, date and reference, manual matching, booking of bank-only items (charges, interest) from the statement, the reconciliation proof (books − uncleared entries + unbooked bank items = statement), completion lock, and deletion of a wrongly imported open statement.
+- Cash flow statement (direct method): every bank / cash movement classified by the other side of its journal into operating, investing and financing activities (accounts can be marked Investing or Financing), always agreeing with the cash accounts.
 - Backfill (`npm run ledger:backfill`, run automatically by Docker start-up) posts journals for documents created before accounting was enabled. Integration tests reconcile the ledger to the stock ledger and to open receivables / payables.
 
 ### Customers / suppliers
@@ -67,10 +73,12 @@ Sales by period, sales by customer, sales order status, quotation conversion, pu
 
 ## Known limitations
 
-- **Accounting Phase 3 not yet built**: bank reconciliation, budgets, fixed assets and depreciation, unrealised foreign-exchange revaluation of open balances at period end, and a cash flow statement.
-- Refunds of customer credit (paying money back) and supplier refunds are not documents yet; record them with a manual journal on the party's receivable / payable.
+- **ERPNext history import** is not built yet: it needs an export of the ERPNext Chart of Accounts and General Ledger to build and test against.
+- Depreciation is straight-line only (no reducing-balance); assets are capitalised individually (no purchase-invoice-to-asset wizard).
+- Bank statements are imported from CSV; MT940 / OFX formats and direct bank feeds are not supported.
+- Budgets are entered as annual amounts spread evenly by month (monthly amounts can be sent through the service, not yet edited on screen).
+- The cash flow statement uses the direct method; an indirect-method reconciliation from profit is not produced.
 - Goods returned to a supplier *before* they are invoiced post at average cost against GRNI; a small difference to the receipt cost can remain in GRNI and is cleared with a manual journal. Returns linked to a debit note clear exactly.
-- **ERPNext history import** (10 years of journals) is planned as a separate step and needs an export from the ERPNext system to build and test against.
 - Stock balances are kept per warehouse and lot; bin location is recorded on movements and items but there is no per-bin balance.
 - Weighted-average cost is company-wide (not per warehouse); reversals restore quantities at the original cost but do not recompute historical averages.
 - Credit limit is displayed and warned about, not enforced as a hard block.
@@ -82,9 +90,9 @@ Sales by period, sales by customer, sales order status, quotation conversion, pu
 
 ## Suggested next steps
 
-1. Accounting Phase 3: bank reconciliation, budgets, fixed assets and depreciation, period-end foreign-exchange revaluation, cash flow statement, customer / supplier refunds.
+1. ERPNext migration: import the chart of accounts, opening balances and historical journals from an ERPNext export, with reconciliation reports.
 2. Customer and supplier statements as printable documents and email.
-3. ERPNext migration: import the chart of accounts, opening balances and historical journals from an ERPNext export, with reconciliation reports.
+3. Reducing-balance depreciation, asset creation from supplier invoices, monthly budget editing on screen, MT940 / OFX bank statements.
 4. Equipment rental module (rental orders, on-hire / off-hire, inspection and certification schedules, rental invoicing).
 5. Email notifications for approvals and alerts; PDF generation server-side for emailing.
 6. Per-bin stock balances and barcode / QR scanning for store transactions.

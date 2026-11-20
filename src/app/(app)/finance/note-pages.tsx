@@ -14,8 +14,10 @@ import { JournalPanel } from "@/components/journal-panel";
 import { HistoryPanel } from "@/components/panels";
 import { PrintButton } from "@/components/print-button";
 import {
-  postCreditNoteAction, cancelCreditNoteAction, postDebitNoteAction, cancelDebitNoteAction, allocateCustomerCreditAction, allocateSupplierCreditAction,
+  postCreditNoteAction, cancelCreditNoteAction, postDebitNoteAction, cancelDebitNoteAction, allocateCustomerCreditAction, allocateSupplierCreditAction, refundAction,
 } from "@/app/actions/finance";
+import { refundsFor } from "@/server/services/payments";
+import { bankAccountOptions } from "@/components/journal-panel";
 import { listArgs, str, type SP } from "@/lib/params";
 import { fmtAmount, fmtDate, fmtMoney } from "@/lib/format";
 import { D } from "@/lib/decimal";
@@ -57,6 +59,7 @@ export async function NoteDetail({ kind, user, id }: { kind: Kind; user: Session
   const open = nt.status === "POSTED" ? D(nt.total).sub(D(nt.allocatedAmount)) : D(0);
   const openInvoices = open.gt(0) ? (kind === "credit" ? await openSalesInvoices(party.id, nt.currency) : await openPurchaseInvoices(party.id, nt.currency)) : [];
   const allocate = kind === "credit" ? allocateCustomerCreditAction.bind(null, { creditNoteId: id }) : allocateSupplierCreditAction.bind(null, { debitNoteId: id });
+  const [refunds, banks] = await Promise.all([refundsFor(kind === "credit" ? { creditNoteId: id } : { debitNoteId: id }), bankAccountOptions()]);
   const link = "customerReturn" in nt ? nt.customerReturn && { label: "Customer return", no: nt.customerReturn.number, href: `/sales/returns/${nt.customerReturn.id}` }
     : (nt as unknown as { purchaseReturn: { id: string; number: string } | null }).purchaseReturn && { label: "Purchase return", no: (nt as unknown as { purchaseReturn: { number: string } }).purchaseReturn.number, href: `/purchasing/returns/${(nt as unknown as { purchaseReturn: { id: string } }).purchaseReturn.id}` };
   return (
@@ -69,6 +72,9 @@ export async function NoteDetail({ kind, user, id }: { kind: Kind; user: Session
           {open.gt(0) && openInvoices.length > 0 && manage && <QuickFormButton variant="action" label="Apply to invoice" title={`Apply ${fmtMoney(open, nt.currency)} unapplied credit`} action={allocate}
             initial={{ invoiceId: openInvoices[0].id, amount: (open.lt(openInvoices[0].balance) ? open : openInvoices[0].balance).toFixed(2) }}
             fields={[{ name: "invoiceId", label: "Invoice", type: "select", required: true, options: openInvoices.map((i) => ({ value: i.id, label: `${i.number} · open ${fmtAmount(i.balance)}` })) }, { name: "amount", label: `Amount (${nt.currency})`, required: true }]} />}
+          {open.gt(0) && manage && <QuickFormButton icon="none" label={kind === "credit" ? "Refund to customer" : "Record supplier refund"} title={`Refund of ${nt.number}`}
+            action={refundAction.bind(null, kind === "credit" ? { side: "CUSTOMER", creditNoteId: id } : { side: "SUPPLIER", debitNoteId: id })} initial={{ amount: open.toFixed(2), accountId: banks.defaultId, method: "BANK_TRANSFER" }}
+            fields={[{ name: "amount", label: `Amount (${nt.currency})`, required: true }, { name: "date", label: "Date", type: "date" }, { name: "accountId", label: kind === "credit" ? "Paid from" : "Received into", type: "select", required: true, options: banks.options }, { name: "reference", label: "Reference" }, { name: "reason", label: "Reason", required: true }]} />}
           <PrintButton />
         </>} />
       {open.gt(0) && openInvoices.length === 0 && <div className="mb-4"><Notice>{fmtMoney(open, nt.currency)} of this note is unapplied and stays on the {t.party.toLowerCase()}&apos;s account until it is applied to another invoice.</Notice></div>}
@@ -83,6 +89,8 @@ export async function NoteDetail({ kind, user, id }: { kind: Kind; user: Session
             <DataTable basePath={`${t.base}/${id}`} empty="Not applied" columns={[{ label: "Invoice" }, { label: "Applied on" }, { label: "Amount", align: "right" }]}
               rows={nt.allocations.map((a) => ({ key: a.id, cells: [<Link key="i" className="link" href={`${t.invBase}/${a.invoiceId}`}>{a.invoice.number}</Link>, fmtDate(a.date), fmtMoney(a.amount, nt.currency)] }))} />
           </Card>}
+          {refunds.length > 0 && <Card title="Refunds" bodyClass="p-0 no-print"><DataTable basePath={`${t.base}/${id}`} columns={[{ label: "Refund" }, { label: "Date" }, { label: "Reason" }, { label: "Amount", align: "right" }]}
+            rows={refunds.map((r) => ({ key: r.id, cells: [r.number, fmtDate(r.date), r.reason, fmtMoney(r.amount, r.currency)] }))} /></Card>}
           <Notice><Link className="link" href={`${t.invBase}/${nt.invoiceId}`}>Open invoice {nt.invoice.number}</Link>{link && <> · <Link className="link" href={link.href}>{link.label} {link.no}</Link></>}</Notice>
         </div>
         <div className="no-print space-y-4">

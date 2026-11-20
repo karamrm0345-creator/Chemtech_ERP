@@ -25,11 +25,14 @@ export const POSTING_KEYS = {
   ROUNDING: "Rounding differences",
   EXCHANGE_DIFF: "Realised exchange differences",
   WHT_PAYABLE: "Withholding tax payable",
+  UNREALISED_FX: "Unrealised exchange differences (period-end revaluation)",
+  ASSET_DISPOSAL: "Gain or loss on disposal of fixed assets",
+  BANK_CHARGES: "Bank charges (from bank reconciliation)",
 } as const;
 
 export type PostingKey = keyof typeof POSTING_KEYS;
 
-type Row = { code: string; name: string; type: AccountType; parent?: string; group?: boolean; bank?: boolean; key?: PostingKey };
+type Row = { code: string; name: string; type: AccountType; parent?: string; group?: boolean; bank?: boolean; key?: PostingKey; cashFlow?: "INVESTING" | "FINANCING" };
 
 /** Standard chart for a Qatar trading and oilfield-services company. Seeded once into an empty chart. */
 export const STANDARD_CHART: Row[] = [
@@ -42,8 +45,8 @@ export const STANDARD_CHART: Row[] = [
   { code: "1150", name: "Input tax recoverable", type: "ASSET", parent: "1100", key: "TAX_INPUT" },
   { code: "1160", name: "Advances and prepayments", type: "ASSET", parent: "1100" },
   { code: "1200", name: "Non-current assets", type: "ASSET", parent: "1000", group: true },
-  { code: "1210", name: "Property, plant and equipment", type: "ASSET", parent: "1200" },
-  { code: "1220", name: "Accumulated depreciation", type: "ASSET", parent: "1200" },
+  { code: "1210", name: "Property, plant and equipment", type: "ASSET", parent: "1200", cashFlow: "INVESTING" },
+  { code: "1220", name: "Accumulated depreciation", type: "ASSET", parent: "1200", cashFlow: "INVESTING" },
   { code: "2000", name: "Liabilities", type: "LIABILITY", group: true },
   { code: "2100", name: "Current liabilities", type: "LIABILITY", parent: "2000", group: true },
   { code: "2110", name: "Accounts payable", type: "LIABILITY", parent: "2100", key: "AP" },
@@ -55,13 +58,14 @@ export const STANDARD_CHART: Row[] = [
   { code: "2200", name: "Non-current liabilities", type: "LIABILITY", parent: "2000", group: true },
   { code: "2210", name: "End of service benefits", type: "LIABILITY", parent: "2200" },
   { code: "3000", name: "Equity", type: "EQUITY", group: true },
-  { code: "3100", name: "Share capital", type: "EQUITY", parent: "3000" },
+  { code: "3100", name: "Share capital", type: "EQUITY", parent: "3000", cashFlow: "FINANCING" },
   { code: "3200", name: "Retained earnings", type: "EQUITY", parent: "3000", key: "RETAINED_EARNINGS" },
   { code: "3300", name: "Opening balance equity", type: "EQUITY", parent: "3000", key: "OPENING_BALANCE" },
   { code: "4000", name: "Income", type: "INCOME", group: true },
   { code: "4100", name: "Sales - goods", type: "INCOME", parent: "4000", key: "SALES" },
   { code: "4200", name: "Sales - services", type: "INCOME", parent: "4000", key: "SALES_SERVICE" },
   { code: "4900", name: "Other income", type: "INCOME", parent: "4000" },
+  { code: "4910", name: "Gain or loss on disposal of assets", type: "INCOME", parent: "4000", key: "ASSET_DISPOSAL" },
   { code: "5000", name: "Cost of sales", type: "EXPENSE", group: true },
   { code: "5100", name: "Cost of goods sold", type: "EXPENSE", parent: "5000", key: "COGS" },
   { code: "5200", name: "Purchase price variance", type: "EXPENSE", parent: "5000", key: "PRICE_VARIANCE" },
@@ -73,7 +77,8 @@ export const STANDARD_CHART: Row[] = [
   { code: "6300", name: "Utilities and communication", type: "EXPENSE", parent: "6000" },
   { code: "6400", name: "Internal stock consumption", type: "EXPENSE", parent: "6000", key: "STOCK_CONSUMPTION" },
   { code: "6500", name: "Depreciation", type: "EXPENSE", parent: "6000" },
-  { code: "6900", name: "Bank charges", type: "EXPENSE", parent: "6000" },
+  { code: "6900", name: "Bank charges", type: "EXPENSE", parent: "6000", key: "BANK_CHARGES" },
   { code: "6950", name: "Exchange differences", type: "EXPENSE", parent: "6000", key: "EXCHANGE_DIFF" },
+  { code: "6960", name: "Unrealised exchange differences", type: "EXPENSE", parent: "6000", key: "UNREALISED_FX" },
   { code: "6990", name: "Rounding differences", type: "EXPENSE", parent: "6000", key: "ROUNDING" },
 ];

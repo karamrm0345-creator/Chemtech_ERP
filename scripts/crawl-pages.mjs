@@ -16,12 +16,13 @@ const P = ["/dashboard", "/approvals", "/admin/users", "/admin/roles", "/admin/r
   "/accounting/accounts", "/accounting/accounts?inactive=1", "/accounting/journals", "/accounting/journals/new", "/accounting/ledger", "/accounting/trial-balance",
   "/accounting/profit-loss", "/accounting/balance-sheet", "/accounting/fiscal-years", "/accounting/cost-centers", "/accounting/tax-codes",
   "/finance/receipts", "/finance/receipts?open=1", "/finance/receipts/new", "/finance/payments", "/finance/payments/new", "/finance/credit-notes", "/finance/debit-notes",
-  "/sales/returns", "/reports/customer-aging", "/reports/supplier-aging", "/reports/tax-summary"];
+  "/sales/returns", "/reports/customer-aging", "/reports/supplier-aging", "/reports/tax-summary",
+  "/accounting/assets", "/accounting/assets/categories", "/accounting/budgets", "/accounting/bank", "/accounting/bank/import", "/accounting/revaluation", "/accounting/cash-flow"];
 const detail = { customer: "/customers", supplier: "/suppliers", item: "/inventory/items", salesQuotation: "/sales/quotations", salesOrder: "/sales/orders", deliveryOrder: "/sales/deliveries",
   purchaseRequest: "/purchasing/requests", rfq: "/purchasing/rfqs", supplierQuotation: "/purchasing/supplier-quotations", purchaseOrder: "/purchasing/orders", goodsReceipt: "/purchasing/receipts",
   purchaseReturn: "/purchasing/returns", stockDocument: "/inventory/documents", stockCount: "/inventory/counts", salesInvoice: "/finance/sales-invoices", purchaseInvoice: "/finance/purchase-invoices", role: "/admin/roles",
   journalEntry: "/accounting/journals", customerPayment: "/finance/receipts", supplierPayment: "/finance/payments", creditNote: "/finance/credit-notes",
-  debitNote: "/finance/debit-notes", customerReturn: "/sales/returns" };
+  debitNote: "/finance/debit-notes", customerReturn: "/sales/returns", fixedAsset: "/accounting/assets", budget: "/accounting/budgets", bankStatement: "/accounting/bank" };
 for (const [m, base] of Object.entries(detail)) for (const id of await ids(m)) P.push(`${base}/${id}`);
 for (const id of await ids("account", { isGroup: false }, 2)) P.push(`/accounting/ledger?account=${id}`);
 for (const id of await ids("salesInvoice", { status: { in: ["POSTED", "PARTIALLY_PAID", "PAID"] } }, 1)) P.push(`/finance/credit-notes/new?invoiceId=${id}`);

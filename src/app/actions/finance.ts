@@ -83,3 +83,7 @@ export async function openInvoicesAction(side: "customer" | "supplier", partyId:
     }));
   });
 }
+
+export async function refundAction(source: { side: "CUSTOMER" | "SUPPLIER"; paymentId?: string; creditNoteId?: string; debitNoteId?: string }, data: Record<string, string>) {
+  return runAction(async (u) => ({ id: (await P.recordRefund(u, { ...data, ...source })).id }), { revalidate: R, message: "Refund recorded" });
+}

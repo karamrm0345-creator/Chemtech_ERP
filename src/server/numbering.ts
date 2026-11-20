@@ -24,6 +24,8 @@ export const DOC_TYPES = {
   CREDIT_NOTE: { prefix: "CN", includeYear: true, padding: 5 },
   DEBIT_NOTE: { prefix: "DN", includeYear: true, padding: 5 },
   CUSTOMER_RETURN: { prefix: "SRT", includeYear: true, padding: 5 },
+  REFUND: { prefix: "RFD", includeYear: true, padding: 5 },
+  FIXED_ASSET: { prefix: "FA", includeYear: false, padding: 5 },
 } as const;
 
 export type DocType = keyof typeof DOC_TYPES;

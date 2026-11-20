@@ -61,6 +61,9 @@ export const PERMISSION_GROUPS = {
     "accounting.journal.post": "Post and reverse manual journal entries",
     "accounting.coa.manage": "Manage chart of accounts and posting accounts",
     "accounting.period.close": "Close periods and fiscal years",
+    "accounting.assets.manage": "Manage fixed assets and run depreciation",
+    "accounting.bank.reconcile": "Import bank statements and reconcile bank accounts",
+    "accounting.budget.manage": "Prepare budgets",
   },
   Reports: {
     "reports.view": "View operational reports",
@@ -90,7 +93,7 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
     permissions: [...view, "dashboard.executive", "dashboard.financial", "finance.view", "reports.export", "audit.view",
       "sales.quotation.approve", "sales.order.approve", "purchase.request.approve", "purchase.order.approve",
       "inventory.adjust.approve", "supplier.bank.view", "attachment.upload",
-      "accounting.view", "accounting.journal.post", "accounting.period.close"],
+      "accounting.view", "accounting.journal.post", "accounting.period.close", "accounting.budget.manage"],
   },
   {
     code: "SALES_MANAGER", name: "Sales Manager", description: "Manages and approves sales",
@@ -130,7 +133,8 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
     code: "FINANCE_OFFICER", name: "Finance Officer", description: "Invoices, receipts and supplier payments",
     permissions: [...view, "dashboard.financial", "finance.view", "finance.sales.manage", "finance.purchase.manage",
       "supplier.bank.view", "reports.export", "attachment.upload",
-      "accounting.view", "accounting.journal.manage", "accounting.journal.post", "accounting.coa.manage"],
+      "accounting.view", "accounting.journal.manage", "accounting.journal.post", "accounting.coa.manage",
+      "accounting.assets.manage", "accounting.bank.reconcile", "accounting.budget.manage"],
   },
   {
     code: "SYSTEM_ADMIN", name: "System Administrator", description: "Users, roles and settings (no business approvals)",
@@ -150,4 +154,5 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
 export const PERMISSION_UPGRADES: { version: number; permissions: Permission[] }[] = [
   { version: 1, permissions: ["accounting.view", "accounting.journal.manage", "accounting.journal.post", "accounting.coa.manage", "accounting.period.close"] },
   { version: 2, permissions: ["sales.return.manage"] },
+  { version: 3, permissions: ["accounting.assets.manage", "accounting.bank.reconcile", "accounting.budget.manage"] },
 ];

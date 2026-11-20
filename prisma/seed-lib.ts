@@ -38,7 +38,7 @@ export async function seedBase(prisma: PrismaClient) {
     const ids = new Map<string, string>();
     for (const a of STANDARD_CHART) {
       const acc = await prisma.account.create({
-        data: { code: a.code, name: a.name, type: a.type, isGroup: !!a.group, isBank: !!a.bank, parentId: a.parent ? ids.get(a.parent) : null },
+        data: { code: a.code, name: a.name, type: a.type, isGroup: !!a.group, isBank: !!a.bank, cashFlowCategory: a.cashFlow ?? null, parentId: a.parent ? ids.get(a.parent) : null },
       });
       ids.set(a.code, acc.id);
     }
@@ -52,6 +52,14 @@ export async function seedBase(prisma: PrismaClient) {
       acc = await prisma.account.create({ data: { code: std.code, name: std.name, type: std.type, parentId: parent?.isGroup ? parent.id : null } });
     }
     if (acc && !(await prisma.accountDefault.findUnique({ where: { key } }))) await prisma.accountDefault.create({ data: { key, accountId: acc.id } });
+  }
+
+  // A default fixed-asset category on the standard accounts, when none exists yet.
+  if ((await prisma.assetCategory.count()) === 0) {
+    const [ppe, acc, dep] = await Promise.all(["1210", "1220", "6500"].map((code) => prisma.account.findUnique({ where: { code } })));
+    if (ppe && acc && dep && !ppe.isGroup && !acc.isGroup && !dep.isGroup) {
+      await prisma.assetCategory.create({ data: { name: "Equipment and tools", assetAccountId: ppe.id, accumulatedAccountId: acc.id, expenseAccountId: dep.id, usefulLifeMonths: 60 } });
+    }
   }
 
   const currencies = [

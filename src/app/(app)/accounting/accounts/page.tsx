@@ -27,6 +27,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     { name: "isGroup", label: "Group account (holds sub-accounts, no postings)", type: "select" as const, options: YES_NO },
     { name: "isBank", label: "Bank / cash account (selectable on payments)", type: "select" as const, options: YES_NO },
     ...(withActive ? [{ name: "active", label: "Active", type: "select" as const, options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] }] : []),
+    { name: "cashFlowCategory", label: "Cash flow activity (when paid in cash)", type: "select" as const, options: [{ value: "OPERATING", label: "Operating" }, { value: "INVESTING", label: "Investing (fixed assets, investments)" }, { value: "FINANCING", label: "Financing (capital, loans, dividends)" }] },
     { name: "description", label: "Description", type: "textarea" as const },
   ];
   return (
@@ -52,7 +53,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 <span key="b" className="flex gap-1">{n.isBank && <Badge tone="blue">Bank</Badge>}{!n.active && <Badge tone="amber">Inactive</Badge>}</span>,
                 <span key="v" className={cn(n.isGroup && "font-semibold", n.balance.lt(0) && "text-red-600")}>{fmtAmount(n.balance)}</span>,
                 ...(manage ? [<QuickFormButton key="e" icon="edit" label="Edit" title={`Edit ${n.code} ${n.name}`} action={updateAccountAction.bind(null, n.id)} fields={accountFields(true)}
-                  initial={{ code: n.code, name: n.name, type: n.type, parentId: n.parentId ?? "", isGroup: n.isGroup ? "yes" : "no", isBank: n.isBank ? "yes" : "no", active: n.active ? "yes" : "no", description: n.description ?? "" }} />] : []),
+                  initial={{ code: n.code, name: n.name, type: n.type, parentId: n.parentId ?? "", isGroup: n.isGroup ? "yes" : "no", isBank: n.isBank ? "yes" : "no", active: n.active ? "yes" : "no", description: n.description ?? "", cashFlowCategory: n.cashFlowCategory ?? "" }} />] : []),
               ],
             }))} />
         </div>

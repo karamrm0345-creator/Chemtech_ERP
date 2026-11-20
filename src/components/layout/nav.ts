@@ -49,6 +49,11 @@ export const NAV: NavGroup[] = [
     { label: "Balance sheet", href: "/accounting/balance-sheet", perm: ["accounting.view"], icon: "Landmark" },
     { label: "Cost centres", href: "/accounting/cost-centers", perm: ["accounting.view"], icon: "Network" },
     { label: "Tax codes", href: "/accounting/tax-codes", perm: ["accounting.view"], icon: "Percent" },
+    { label: "Cash flow", href: "/accounting/cash-flow", perm: ["accounting.view"], icon: "Waves" },
+    { label: "Bank reconciliation", href: "/accounting/bank", perm: ["accounting.view"], icon: "Landmark" },
+    { label: "Fixed assets", href: "/accounting/assets", perm: ["accounting.view"], icon: "Truck" },
+    { label: "Budgets", href: "/accounting/budgets", perm: ["accounting.view"], icon: "Target" },
+    { label: "FX revaluation", href: "/accounting/revaluation", perm: ["accounting.view"], icon: "RefreshCw" },
     { label: "Fiscal years", href: "/accounting/fiscal-years", perm: ["accounting.view"], icon: "CalendarRange" },
   ] },
   { label: "Insight", items: [

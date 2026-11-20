@@ -332,3 +332,85 @@ export async function supplierCredits(supplierId: string) {
     ...notes.filter((n) => D(n.total).gt(D(n.allocatedAmount))).map((n) => ({ kind: "debitNote" as const, id: n.id, number: n.number, date: n.date, currency: n.currency, open: D(n.total).sub(D(n.allocatedAmount)) })),
   ];
 }
+
+// ───────── Refunds ─────────
+
+export const refundSchema = z.object({
+  side: z.enum(["CUSTOMER", "SUPPLIER"]),
+  paymentId: optId,
+  creditNoteId: optId,
+  debitNoteId: optId,
+  amount: posDecimal,
+  date: optDate,
+  method: z.enum(["BANK_TRANSFER", "CHEQUE", "CASH", "CARD", "OTHER"]).default("BANK_TRANSFER"),
+  accountId: optId,
+  reference: optStr(100),
+  reason: z.string().trim().min(1, "Required").max(500),
+});
+
+/**
+ * Pays back unused customer credit (an unallocated receipt or credit note), or
+ * records money a supplier returns (unallocated payment or debit note). The
+ * refunded amount is used up on the source document like an allocation.
+ */
+export async function recordRefund(ctx: Ctx, raw: unknown) {
+  const d = refundSchema.parse(raw);
+  requirePerm(ctx, d.side === "CUSTOMER" ? "finance.sales.manage" : "finance.purchase.manage");
+  const sources = [d.paymentId, d.creditNoteId, d.debitNoteId].filter(Boolean);
+  if (sources.length !== 1) throw new AppError("Choose the receipt, payment or note being refunded.");
+  if (d.side === "CUSTOMER" && d.debitNoteId) throw new AppError("A customer refund comes from a receipt or credit note.");
+  if (d.side === "SUPPLIER" && d.creditNoteId) throw new AppError("A supplier refund comes from a payment or debit note.");
+  return withTx(async (tx) => {
+    await assertFinance(tx);
+    let src: { partyId: string; currency: string; rate: Dec; open: Dec; no: string };
+    if (d.paymentId && d.side === "CUSTOMER") {
+      await lock(tx, "CustomerPayment", d.paymentId);
+      const p = await tx.customerPayment.findUniqueOrThrow({ where: { id: d.paymentId } });
+      src = { partyId: p.customerId, currency: p.currency, rate: D(p.exchangeRate), open: D(p.amount).sub(D(p.allocatedAmount)), no: p.number };
+    } else if (d.paymentId) {
+      await lock(tx, "SupplierPayment", d.paymentId);
+      const p = await tx.supplierPayment.findUniqueOrThrow({ where: { id: d.paymentId } });
+      src = { partyId: p.supplierId, currency: p.currency, rate: D(p.exchangeRate), open: D(p.amount).sub(D(p.allocatedAmount)), no: p.number };
+    } else if (d.creditNoteId) {
+      await lock(tx, "CreditNote", d.creditNoteId);
+      const n = await tx.creditNote.findUniqueOrThrow({ where: { id: d.creditNoteId } });
+      if (n.status !== "POSTED") throw new AppError(`${n.number} is not posted.`);
+      src = { partyId: n.customerId, currency: n.currency, rate: D(n.exchangeRate), open: D(n.total).sub(D(n.allocatedAmount)), no: n.number };
+    } else {
+      await lock(tx, "DebitNote", d.debitNoteId!);
+      const n = await tx.debitNote.findUniqueOrThrow({ where: { id: d.debitNoteId } });
+      if (n.status !== "POSTED") throw new AppError(`${n.number} is not posted.`);
+      src = { partyId: n.supplierId, currency: n.currency, rate: D(n.exchangeRate), open: D(n.total).sub(D(n.allocatedAmount)), no: n.number };
+    }
+    const amount = round2(D(d.amount));
+    if (amount.gt(src.open)) throw new AppError(`${src.no} has only ${src.open.toFixed(2)} ${src.currency} unallocated.`);
+    const accountId = await paymentAccount(tx, d.accountId, d.method);
+    const number = await nextNumber(tx, "REFUND");
+    const date = d.date ?? new Date();
+    const r = await tx.refund.create({
+      data: {
+        number, side: d.side, customerId: d.side === "CUSTOMER" ? src.partyId : null, supplierId: d.side === "SUPPLIER" ? src.partyId : null,
+        paymentId: d.paymentId, creditNoteId: d.creditNoteId, debitNoteId: d.debitNoteId, amount, currency: src.currency, exchangeRate: src.rate,
+        date, accountId, method: d.method, reference: d.reference, reason: d.reason, createdById: ctx.userId,
+      },
+    });
+    if (d.paymentId && d.side === "CUSTOMER") await tx.customerPayment.update({ where: { id: d.paymentId }, data: { allocatedAmount: { increment: amount } } });
+    else if (d.paymentId) await tx.supplierPayment.update({ where: { id: d.paymentId }, data: { allocatedAmount: { increment: amount } } });
+    else if (d.creditNoteId) await tx.creditNote.update({ where: { id: d.creditNoteId }, data: { allocatedAmount: { increment: amount } } });
+    else await tx.debitNote.update({ where: { id: d.debitNoteId! }, data: { allocatedAmount: { increment: amount } } });
+    const base = amount.mul(src.rate);
+    await postJournal(tx, ctx, {
+      date, type: "REFUND", memo: `Refund ${number} of ${src.no}: ${d.reason}`, reference: d.reference,
+      source: { type: "Refund", id: r.id, no: number },
+      lines: d.side === "CUSTOMER"
+        ? [{ account: "AR", debit: base, partyType: "CUSTOMER", partyId: src.partyId }, { account: { id: accountId }, credit: base }]
+        : [{ account: { id: accountId }, debit: base }, { account: "AP", credit: base, partyType: "SUPPLIER", partyId: src.partyId }],
+    });
+    await audit(tx, ctx, { action: "CREATE", entity: "Refund", entityId: r.id, summary: `Refund ${number}: ${src.currency} ${amount.toFixed(2)} ${d.side === "CUSTOMER" ? "paid to customer" : "received from supplier"} from ${src.no}` });
+    return r;
+  });
+}
+
+export async function refundsFor(source: { paymentId?: string; creditNoteId?: string; debitNoteId?: string }) {
+  return prisma.refund.findMany({ where: source, orderBy: { date: "asc" } });
+}

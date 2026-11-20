@@ -31,6 +31,7 @@ export const accountSchema = z.object({
   isBank: z.coerce.boolean().default(false),
   description: optStr(500),
   active: z.coerce.boolean().default(true),
+  cashFlowCategory: z.preprocess((v) => (v === "" || v == null ? null : v), z.enum(["OPERATING", "INVESTING", "FINANCING"]).nullable()).default(null),
 });
 
 async function checkParent(tx: Tx, parentId: string | undefined, type: AccountType, selfId?: string) {

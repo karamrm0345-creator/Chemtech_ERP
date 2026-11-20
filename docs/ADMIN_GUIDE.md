@@ -57,6 +57,17 @@ Changing a user's role, deactivating them or resetting their password signs out 
 - **Customer returns** need the *Receive goods returned by customers* permission (Sales Manager, Store Manager and Storekeeper by default).
 - **Tax codes** (Accounting → Tax codes): one active code per rate, pointing to its output and input tax accounts.
 - **Cost centres** (Accounting → Cost centres): divisions or projects; choose one on invoices and journal lines to get a profit & loss per cost centre.
+- **Month-end checklist**:
+  1. Post all invoices, receipts, payments and stock documents for the month.
+  2. Accounting → Fixed assets → *Run depreciation* for the month.
+  3. Accounting → Bank reconciliation: import each bank statement, *Auto-match*, match or *Book* what is left, *Complete reconciliation*.
+  4. Accounting → FX revaluation: check the closing rates, preview, post (it reverses itself on the next day).
+  5. Review the trial balance, P&L, balance sheet, cash flow and budget versus actual, then set the books lock date.
+- **Fixed assets**: register the asset, then *Capitalise* it against the account the purchase was booked to (bank, the expense or clearing
+  account of the supplier invoice, or Opening balance equity for assets brought over with their depreciation to date).
+- **Refunds**: open the receipt, payment or note with an unallocated balance and choose *Refund*.
+- **Budgets**: Accounting → Budgets → New budget, then enter annual amounts per income and expense account.
+- New permissions: *Manage fixed assets and run depreciation*, *Import bank statements and reconcile*, *Prepare budgets* (Finance Officer; budgets also General Manager).
 - Permissions added in this release are granted once to the default roles that include them; changes you made to roles are kept.
 
 ## Security notes

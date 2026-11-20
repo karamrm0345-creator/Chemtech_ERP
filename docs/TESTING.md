@@ -48,11 +48,17 @@ the invoice (quantity and price limits, double posting refused), credit left on 
 note for a purchase return clearing GRNI with the cost difference to variance; tax code accounts and cost-centre P&L; and the
 reconciliation and new aging / tax reports.
 
+Accounting phase 3 (`tests/accounting-phase3.test.ts`): customer and supplier refunds (limits, permissions, party balances);
+period-end revaluation of a USD receivable with automatic reversal and duplicate-date protection; fixed asset capitalisation,
+depreciation catch-up, no double charge, disposal blocked until depreciation is up to date, gain on disposal; budget versus actual
+for a cost centre; bank statement CSV import with balance check, auto-matching, uncleared cheque, booking a bank fee, completion and
+duplicate-import protection; deleting a mis-imported statement with reversal; and a cash flow statement that agrees with the cash accounts.
+
 ### Latest result
 
 ```
- Test Files  9 passed (9)
-      Tests  62 passed (62)
+ Test Files  10 passed (10)
+      Tests  69 passed (69)
 ```
 
 (run on 2026-11-20, PostgreSQL 16, Node 22)
@@ -89,7 +95,8 @@ inspected. The sidebar collapses into a drawer, KPI cards and charts stack, and 
 
 | Run | Result |
 |---|---|
-| Page crawl: General Manager, Finance Officer, Read-Only Auditor, Storekeeper, Sales Officer | 141 pages each, 0 problems (pages outside each role correctly refused) |
+| Page crawl: General Manager, Finance Officer, Read-Only Auditor, Storekeeper, Sales Officer | 151 pages each, 0 problems (pages outside each role correctly refused) |
+| Asset registered, capitalised and depreciated; budget with budget vs actual; bank statement imported from CSV, auto-matched, fee booked, reconciled; refund; FX revaluation preview; cash flow | passed |
 | Manual journal prepared by Finance, posted by GM; statements reviewed | passed |
 | Receipt allocated oldest-first with advance; supplier payment with 5 % withholding; credit note; debit note; customer return; cost centre; aging and tax reports | passed |
 | Playwright e2e (sales workflow, access control) | 2 passed |

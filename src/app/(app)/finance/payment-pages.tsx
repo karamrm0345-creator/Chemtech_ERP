@@ -10,7 +10,8 @@ import { QuickFormButton } from "@/components/forms/small-forms";
 import { JournalPanel, bankAccountOptions } from "@/components/journal-panel";
 import { HistoryPanel } from "@/components/panels";
 import { PrintButton } from "@/components/print-button";
-import { allocateCustomerCreditAction, allocateSupplierCreditAction } from "@/app/actions/finance";
+import { allocateCustomerCreditAction, allocateSupplierCreditAction, refundAction } from "@/app/actions/finance";
+import { refundsFor } from "@/server/services/payments";
 import { dateRange, listArgs, str, type SP } from "@/lib/params";
 import { fmtAmount, fmtDate, fmtMoney, humanize, toDateInput } from "@/lib/format";
 import { D } from "@/lib/decimal";
@@ -76,6 +77,11 @@ export async function PaymentDetail({ side, user, id }: { side: Side; user: Sess
   const wht = "whtAmount" in p ? D((p as { whtAmount: unknown }).whtAmount as string) : D(0);
   const openInvoices = open.gt(0) ? (side === "customer" ? await openSalesInvoices(party.id, p.currency) : await openPurchaseInvoices(party.id, p.currency)) : [];
   const allocate = side === "customer" ? allocateCustomerCreditAction.bind(null, { paymentId: id }) : allocateSupplierCreditAction.bind(null, { paymentId: id });
+  const [refunds, banks] = await Promise.all([refundsFor({ paymentId: id }), bankAccountOptions()]);
+  const refundFields = [{ name: "amount", label: `Amount (${p.currency})`, required: true }, { name: "date", label: "Date", type: "date" as const },
+    { name: "accountId", label: side === "customer" ? "Paid from" : "Received into", type: "select" as const, required: true, options: banks.options },
+    { name: "method", label: "Method", type: "select" as const, options: ["BANK_TRANSFER", "CHEQUE", "CASH", "OTHER"].map((m) => ({ value: m, label: humanize(m) })) },
+    { name: "reference", label: "Reference" }, { name: "reason", label: "Reason", required: true }];
   return (
     <>
       <PageHeader title={p.number} subtitle={party.legalName} crumbs={[{ label: "Finance" }, { label: t.title, href: t.base }, { label: p.number }]}
@@ -83,6 +89,8 @@ export async function PaymentDetail({ side, user, id }: { side: Side; user: Sess
           {open.gt(0) && openInvoices.length > 0 && user.permissions.has(t.manage) && <QuickFormButton variant="action" label="Allocate to invoice" title={`Allocate ${fmtMoney(open, p.currency)} on account`} action={allocate}
             initial={{ invoiceId: openInvoices[0].id, amount: (open.lt(openInvoices[0].balance) ? open : openInvoices[0].balance).toFixed(2) }}
             fields={[{ name: "invoiceId", label: "Invoice", type: "select", required: true, options: openInvoices.map((i) => ({ value: i.id, label: `${i.number} · due ${fmtDate(i.dueDate)} · open ${fmtAmount(i.balance)}` })) }, { name: "amount", label: `Amount (${p.currency})`, required: true }, { name: "date", label: "Date", type: "date" }]} />}
+          {open.gt(0) && user.permissions.has(t.manage) && <QuickFormButton icon="none" label={side === "customer" ? "Refund to customer" : "Record refund from supplier"} title={`Refund from ${p.number}`}
+            action={refundAction.bind(null, { side: side === "customer" ? "CUSTOMER" : "SUPPLIER", paymentId: id })} initial={{ amount: open.toFixed(2), accountId: banks.defaultId, method: "BANK_TRANSFER" }} fields={refundFields} />}
           <PrintButton />
         </>} />
       <div className="grid gap-4 xl:grid-cols-3">
@@ -97,6 +105,8 @@ export async function PaymentDetail({ side, user, id }: { side: Side; user: Sess
             <DataTable basePath={`${t.base}/${id}`} empty="Not allocated to any invoice" columns={[{ label: "Invoice" }, { label: "Invoice date" }, { label: "Allocated on" }, { label: "Amount", align: "right" }]}
               rows={p.allocations.map((a) => ({ key: a.id, cells: [<Link key="i" className="link" href={`${t.invBase}/${a.invoiceId}`}>{a.invoice.number}</Link>, fmtDate(a.invoice.date), fmtDate(a.date), fmtMoney(a.amount, p.currency)] }))} />
           </Card>
+          {refunds.length > 0 && <Card title="Refunds" bodyClass="p-0"><DataTable basePath={`${t.base}/${id}`} columns={[{ label: "Refund" }, { label: "Date" }, { label: "Reason" }, { label: "Amount", align: "right" }]}
+            rows={refunds.map((r) => ({ key: r.id, cells: [r.number, fmtDate(r.date), r.reason, fmtMoney(r.amount, r.currency)] }))} /></Card>}
           {open.gt(0) && openInvoices.length === 0 && <Notice>{fmtMoney(open, p.currency)} is held on account. Allocate it when the next invoice is posted.</Notice>}
         </div>
         <div className="no-print space-y-4">

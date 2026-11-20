@@ -1351,6 +1351,7 @@ model Account {
   children         Account[]         @relation("AccountTree")
   isGroup          Boolean           @default(false) // group accounts only aggregate; no postings
   isBank           Boolean           @default(false) // selectable as the bank / cash account on payments
+  cashFlowCategory String? // OPERATING | INVESTING | FINANCING (cash flow statement); blank = operating
   description      String?
   active           Boolean           @default(true)
   createdAt        DateTime          @default(now())
@@ -1361,6 +1362,11 @@ model Account {
   supplierPayments SupplierPayment[]
   taxOutput        TaxCode[]         @relation("TaxOutput")
   taxInput         TaxCode[]         @relation("TaxInput")
+  bankStatements   BankStatement[]
+  budgetLines      BudgetLine[]
+  assetCost        AssetCategory[]   @relation("AssetCost")
+  assetAccum       AssetCategory[]   @relation("AssetAccum")
+  assetExpense     AssetCategory[]   @relation("AssetExpense")
 
   @@index([type])
   @@index([parentId])
@@ -1387,6 +1393,7 @@ model FiscalYear {
   closedAt         DateTime?
   closedById       String?
   closingJournalId String?
+  budgets          Budget[]
   createdAt        DateTime         @default(now())
 
   @@index([startDate, endDate])
@@ -1430,21 +1437,22 @@ model JournalEntry {
 
 // Ledger lines in base currency. Only lines of POSTED journals count (posted = true).
 model JournalLine {
-  id           String       @id @default(cuid())
-  journalId    String
-  journal      JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
-  lineNo       Int
-  accountId    String
-  account      Account      @relation(fields: [accountId], references: [id])
-  date         DateTime     @db.Date
-  debit        Decimal      @default(0) @db.Decimal(18, 2)
-  credit       Decimal      @default(0) @db.Decimal(18, 2)
-  partyType    String? // CUSTOMER | SUPPLIER
-  partyId      String?
-  description  String?
-  posted       Boolean      @default(false)
-  costCenterId String?
-  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
+  id            String             @id @default(cuid())
+  journalId     String
+  journal       JournalEntry       @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  lineNo        Int
+  accountId     String
+  account       Account            @relation(fields: [accountId], references: [id])
+  date          DateTime           @db.Date
+  debit         Decimal            @default(0) @db.Decimal(18, 2)
+  credit        Decimal            @default(0) @db.Decimal(18, 2)
+  partyType     String? // CUSTOMER | SUPPLIER
+  partyId       String?
+  description   String?
+  posted        Boolean            @default(false)
+  costCenterId  String?
+  costCenter    CostCenter?        @relation(fields: [costCenterId], references: [id])
+  statementLine BankStatementLine?
 
   @@index([accountId, date])
   @@index([posted, date])
@@ -1463,6 +1471,8 @@ model CostCenter {
   lines            JournalLine[]
   salesInvoices    SalesInvoice[]
   purchaseInvoices PurchaseInvoice[]
+  budgets          Budget[]
+  assets           FixedAsset[]
 }
 
 // Tax rate → ledger accounts. Lines keep their rate; postings use the active code with that rate.
@@ -1649,4 +1659,151 @@ model CustomerReturnLine {
   batchNo        String?
   serialNos      String?
   creditedQty    Decimal        @default(0) @db.Decimal(18, 4)
+}
+
+// ───────────────────────── Accounting phase 3 ─────────────────────────
+
+// Money paid back to a customer (unused receipt / credit note) or received back from a supplier.
+model Refund {
+  id           String   @id @default(cuid())
+  number       String   @unique
+  side         String // CUSTOMER | SUPPLIER
+  customerId   String?
+  supplierId   String?
+  paymentId    String? // the receipt / supplier payment whose unallocated balance is refunded
+  creditNoteId String?
+  debitNoteId  String?
+  amount       Decimal  @db.Decimal(18, 2)
+  currency     String   @default("QAR")
+  exchangeRate Decimal  @default(1) @db.Decimal(18, 6)
+  date         DateTime @default(now())
+  accountId    String
+  method       String   @default("BANK_TRANSFER")
+  reference    String?
+  reason       String
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  @@index([customerId])
+  @@index([supplierId])
+}
+
+model BankStatement {
+  id             String              @id @default(cuid())
+  accountId      String
+  account        Account             @relation(fields: [accountId], references: [id])
+  reference      String
+  statementDate  DateTime            @db.Date
+  openingBalance Decimal             @db.Decimal(18, 2)
+  closingBalance Decimal             @db.Decimal(18, 2)
+  status         String              @default("OPEN") // OPEN | RECONCILED
+  reconciledAt   DateTime?
+  reconciledById String?
+  createdById    String
+  createdAt      DateTime            @default(now())
+  lines          BankStatementLine[]
+
+  @@index([accountId, statementDate])
+}
+
+model BankStatementLine {
+  id            String        @id @default(cuid())
+  statementId   String
+  statement     BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  lineNo        Int
+  date          DateTime      @db.Date
+  description   String
+  reference     String?
+  amount        Decimal       @db.Decimal(18, 2) // + money in, − money out
+  journalLineId String?       @unique // matched ledger line on the bank account
+  journalLine   JournalLine?  @relation(fields: [journalLineId], references: [id])
+  matchedAt     DateTime?
+  matchedById   String?
+}
+
+model Budget {
+  id           String       @id @default(cuid())
+  name         String
+  fiscalYearId String
+  fiscalYear   FiscalYear   @relation(fields: [fiscalYearId], references: [id])
+  costCenterId String?
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
+  notes        String?
+  createdById  String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  lines        BudgetLine[]
+
+  @@unique([fiscalYearId, costCenterId, name])
+}
+
+// One row per account and month of the fiscal year (period 1 = first month).
+model BudgetLine {
+  id        String  @id @default(cuid())
+  budgetId  String
+  budget    Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+  period    Int
+  amount    Decimal @db.Decimal(18, 2)
+
+  @@unique([budgetId, accountId, period])
+}
+
+model AssetCategory {
+  id                   String       @id @default(cuid())
+  name                 String       @unique
+  assetAccountId       String
+  assetAccount         Account      @relation("AssetCost", fields: [assetAccountId], references: [id])
+  accumulatedAccountId String
+  accumulatedAccount   Account      @relation("AssetAccum", fields: [accumulatedAccountId], references: [id])
+  expenseAccountId     String
+  expenseAccount       Account      @relation("AssetExpense", fields: [expenseAccountId], references: [id])
+  usefulLifeMonths     Int          @default(60)
+  active               Boolean      @default(true)
+  assets               FixedAsset[]
+}
+
+model FixedAsset {
+  id                      String              @id @default(cuid())
+  number                  String              @unique
+  name                    String
+  categoryId              String
+  category                AssetCategory       @relation(fields: [categoryId], references: [id])
+  serialNo                String?
+  location                String?
+  costCenterId            String?
+  costCenter              CostCenter?         @relation(fields: [costCenterId], references: [id])
+  acquisitionDate         DateTime            @db.Date
+  depreciationStart       DateTime            @db.Date
+  cost                    Decimal             @db.Decimal(18, 2)
+  salvageValue            Decimal             @default(0) @db.Decimal(18, 2)
+  usefulLifeMonths        Int
+  openingAccumulated      Decimal             @default(0) @db.Decimal(18, 2) // depreciation before go-live (migrated assets)
+  accumulatedDepreciation Decimal             @default(0) @db.Decimal(18, 2) // includes opening
+  fundingAccountId        String? // credited when the asset is capitalised (clearing, bank, opening equity …)
+  purchaseInvoiceId       String?
+  status                  String              @default("DRAFT") // DRAFT | ACTIVE | FULLY_DEPRECIATED | DISPOSED
+  capitalisedAt           DateTime?
+  disposedAt              DateTime?           @db.Date
+  disposalProceeds        Decimal?            @db.Decimal(18, 2)
+  notes                   String?
+  createdById             String
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  depreciation            DepreciationEntry[]
+
+  @@index([status])
+}
+
+model DepreciationEntry {
+  id        String     @id @default(cuid())
+  assetId   String
+  asset     FixedAsset @relation(fields: [assetId], references: [id])
+  periodEnd DateTime   @db.Date
+  amount    Decimal    @db.Decimal(18, 2)
+  journalId String
+  createdAt DateTime   @default(now())
+
+  @@unique([assetId, periodEnd])
 }
