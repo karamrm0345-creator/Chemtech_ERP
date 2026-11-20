@@ -65,6 +65,8 @@ Step "Applying database migrations"
 Run npx.cmd @("prisma","migrate","deploy")
 Step "Loading reference data"
 Run npx.cmd @("tsx","prisma/seed-base.ts")
+Step "Updating the general ledger"
+Run npx.cmd @("tsx","scripts/backfill-ledger.ts")
 if ($demoPw) {
   Step "Loading fictional demo data (skipped if already loaded)"
   $env:NODE_ENV = "development"; $env:ALLOW_DEMO_SEED = "1"; $env:DEMO_PASSWORD = $demoPw

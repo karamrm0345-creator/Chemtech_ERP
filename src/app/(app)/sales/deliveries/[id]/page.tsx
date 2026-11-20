@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JournalPanel } from "@/components/journal-panel";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -55,6 +56,7 @@ export default async function DeliveryPage({ params }: { params: Promise<{ id: s
         </div>
         <div className="no-print space-y-4">
           <AttachmentsPanel user={user} docType="DELIVERY_ORDER" docId={id} title="Signed delivery note & documents" />
+          <JournalPanel user={user} sourceType="DeliveryOrder" sourceId={id} />
           <HistoryPanel entity="DeliveryOrder" entityId={id} />
         </div>
       </div>

@@ -3,6 +3,7 @@ import { AlertTriangle, AlertOctagon, Info, ArrowUpRight } from "lucide-react";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { getKpis, getCharts, getAlerts, slowMovingItems, type DashboardFilter } from "@/server/services/dashboard";
+import { netProfit } from "@/server/services/accounting";
 import { PageHeader, Card, Notice } from "@/components/ui/primitives";
 import { TrendChart, GroupedBars, RankBars } from "@/components/charts/charts";
 import { parseBusinessDate, fmtMoney, fmtCompact, fmtDate, toDateInput, fmtQty } from "@/lib/format";
@@ -60,6 +61,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const r = resolveRange(sp);
   const f: DashboardFilter = { from: r.from, to: r.to, customerId: str(sp, "customerId"), supplierId: str(sp, "supplierId"), categoryId: str(sp, "categoryId") };
   const settings = await prisma.companySettings.findUniqueOrThrow({ where: { id: 1 } });
+  const profit = user.permissions.has("accounting.view") ? await netProfit(r.from, r.to) : null;
   const [k, c, alerts, slow, cats, cust, sup] = await Promise.all([
     getKpis(user, f), getCharts(user, f), getAlerts(user), slowMovingItems(settings.slowMovingDays, 8),
     prisma.itemCategory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -91,7 +93,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Kpi label="Customer receivables" value={fmtMoney(k.finance.receivables)} href="/finance/sales-invoices?status=OPEN" />
           <Kpi label="Overdue invoices" value={k.finance.overdueCount} sub={fmtMoney(k.finance.overdueAmount)} href="/finance/sales-invoices?status=OVERDUE" tone={k.finance.overdueCount ? "red" : "green"} />
           <Kpi label="Supplier payables" value={fmtMoney(k.finance.payables)} href="/finance/purchase-invoices?status=OPEN" />
-          <Kpi label="Profit" value={<span className="text-base font-semibold text-ink-muted">Not reported</span>} sub="Requires a general ledger and full cost accounting" />
+          {profit !== null
+            ? <Kpi label={profit.isNeg() ? "Net loss (ledger)" : "Net profit (ledger)"} value={fmtMoney(profit)} sub="Posted income less expenses for the period" href={`/accounting/profit-loss?from=${toDateInput(r.from)}&to=${toDateInput(r.to)}`} tone={profit.isNeg() ? "red" : "green"} />
+            : <Kpi label="Profit" value={<span className="text-base font-semibold text-ink-muted">Restricted</span>} sub="Needs the accounting view permission" />}
         </div>
       ) : (
         k.financeEnabled && <p className="mt-3 text-xs text-ink-muted">Receivables and payables are hidden for your role.</p>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { JournalPanel } from "@/components/journal-panel";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { PageHeader, StatusBadge, Notice } from "@/components/ui/primitives";
@@ -30,6 +31,7 @@ export default async function CountPage({ params }: { params: Promise<{ id: stri
           <ActionButton variant="action" label="Approve & post variances" confirm="Variances against current balances will be posted to the ledger. Continue?" action={postCountAction.bind(null, id)} />} />
       {c.status === "DRAFT" && <div className="mb-4"><Notice>Enter counted quantities and save. Leave blank for items not counted. Variances are calculated against the <b>current</b> balance when posted, so stock moving during the count is respected. A different user with approval rights posts the result.</Notice></div>}
       <CountSheet countId={id} rows={rows} editable={c.status === "DRAFT" && user.permissions.has("inventory.count")} />
+      {c.status === "POSTED" && <div className="mt-4"><JournalPanel user={user} sourceType="StockCount" sourceId={id} /></div>}
     </>
   );
 }

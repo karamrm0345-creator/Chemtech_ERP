@@ -35,6 +35,15 @@ export const NAV: NavGroup[] = [
     { label: "Sales invoices", href: "/finance/sales-invoices", perm: ["finance.view"], icon: "Receipt" },
     { label: "Supplier invoices", href: "/finance/purchase-invoices", perm: ["finance.view"], icon: "FileSpreadsheet" },
   ] },
+  { label: "Accounting", items: [
+    { label: "Chart of accounts", href: "/accounting/accounts", perm: ["accounting.view"], icon: "ListTree" },
+    { label: "Journal entries", href: "/accounting/journals", perm: ["accounting.view"], icon: "NotebookPen" },
+    { label: "General ledger", href: "/accounting/ledger", perm: ["accounting.view"], icon: "BookOpenText" },
+    { label: "Trial balance", href: "/accounting/trial-balance", perm: ["accounting.view"], icon: "Sigma" },
+    { label: "Profit & loss", href: "/accounting/profit-loss", perm: ["accounting.view"], icon: "TrendingUp" },
+    { label: "Balance sheet", href: "/accounting/balance-sheet", perm: ["accounting.view"], icon: "Landmark" },
+    { label: "Fiscal years", href: "/accounting/fiscal-years", perm: ["accounting.view"], icon: "CalendarRange" },
+  ] },
   { label: "Insight", items: [
     { label: "Reports", href: "/reports", perm: ["reports.view", "inventory.view", "audit.view"], icon: "BarChart3" },
   ] },

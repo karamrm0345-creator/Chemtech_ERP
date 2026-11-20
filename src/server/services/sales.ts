@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { postStockJournal } from "../accounting/postings";
 import type { Prisma } from "@prisma/client";
 import { prisma, withTx, type Tx } from "../db";
 import { requirePerm, requireAny, type Ctx } from "../context";
@@ -457,6 +458,7 @@ export async function postDelivery(ctx: Ctx, deliveryId: string) {
     await tx.salesOrder.update({ where: { id: so.id }, data: { status: allDone ? "DELIVERED" : "PARTIALLY_DELIVERED" } });
     if (allDone) await releaseAll(tx, so.lines.map((l) => l.id));
     const posted = await tx.deliveryOrder.update({ where: { id: deliveryId }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date() } });
+    await postStockJournal(tx, ctx, { type: "DeliveryOrder", id: dlv.id, no: dlv.number, memo: `Delivery ${dlv.number} for ${so.number}` });
     await audit(tx, ctx, { action: "POST", entity: "DeliveryOrder", entityId: deliveryId, summary: `Posted delivery ${dlv.number} (${so.number} → ${allDone ? "DELIVERED" : "PARTIALLY DELIVERED"})` });
     return posted;
   });

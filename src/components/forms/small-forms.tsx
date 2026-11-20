@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useAction, type Result } from "./use-action";
 import { Field, Select } from "./fields";
 import { btn } from "@/components/ui/primitives";
 import { Dialog } from "@/components/ui/dialog";
 
 /** Generic "open dialog → fill fields → call action" button. */
-export function QuickFormButton({ label, title, fields, action, variant = "outline", initial = {}, redirectBase, note }: {
-  label: string; title: string; variant?: "outline" | "primary" | "action";
+export function QuickFormButton({ label, title, fields, action, variant = "outline", initial = {}, redirectBase, note, icon = "plus" }: {
+  label: string; title: string; variant?: "outline" | "primary" | "action"; icon?: "plus" | "edit" | "none";
   fields: { name: string; label: string; type?: "text" | "date" | "number" | "textarea" | "select"; required?: boolean; options?: { value: string; label: string }[] }[];
   action: (data: Record<string, string>) => Promise<Result<unknown>>;
   initial?: Record<string, string>;
@@ -20,7 +20,7 @@ export function QuickFormButton({ label, title, fields, action, variant = "outli
   const { run, pending } = useAction();
   return (
     <>
-      <button type="button" className={btn(variant, variant === "outline" ? "py-1.5 text-xs" : "")} onClick={() => setOpen(true)}><Plus className="h-3.5 w-3.5" /> {label}</button>
+      <button type="button" className={btn(variant, variant === "outline" ? "py-1.5 text-xs" : "")} onClick={() => setOpen(true)}>{icon === "plus" ? <Plus className="h-3.5 w-3.5" /> : icon === "edit" ? <Pencil className="h-3.5 w-3.5" /> : null} {label}</button>
       <Dialog open={open} onClose={() => setOpen(false)} title={title}>
         <form className="space-y-3" onSubmit={async (e) => { e.preventDefault(); if (await run(() => action(s), { redirect: redirectBase ? (d) => ((d as { id?: string })?.id ? `${redirectBase}/${(d as { id: string }).id}` : undefined) : undefined })) { setOpen(false); setS(initial); } }}>
           {note && <p className="text-sm text-ink-soft">{note}</p>}

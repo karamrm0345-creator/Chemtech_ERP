@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { postStockJournal } from "../accounting/postings";
+import { reverseSourceJournal } from "../accounting/ledger";
 import type { InvTxnType, Prisma } from "@prisma/client";
 import { prisma, withTx, type Tx } from "../db";
 import { can, requirePerm, type Ctx } from "../context";
@@ -135,6 +137,7 @@ export async function postStockDocument(ctx: Ctx, id: string) {
       where: { id }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date(), approvedById: ctx.userId },
     });
     await recordApproval(tx, ctx, { docType: "STOCK_DOCUMENT", docId: id, docNo: doc.number, action: "POST" });
+    await postStockJournal(tx, ctx, { type: "StockDocument", id, no: doc.number, memo: `${doc.type.charAt(0)}${doc.type.slice(1).toLowerCase()} ${doc.number}${doc.reason ? ` - ${doc.reason}` : ""}` });
     await audit(tx, ctx, { action: "POST", entity: "StockDocument", entityId: id, summary: `Posted ${doc.type.toLowerCase()} ${doc.number}` });
     return posted;
   });
@@ -186,6 +189,7 @@ export async function reverseStockDocument(ctx: Ctx, id: string, reason: string)
       });
     }
     await tx.stockDocument.update({ where: { id }, data: { status: "REVERSED", reversedById: ctx.userId } });
+    await reverseSourceJournal(tx, ctx, "StockDocument", id, `Reversal of ${doc.number}: ${reason}`);
     await audit(tx, ctx, { action: "REVERSE", entity: "StockDocument", entityId: id, summary: `Reversed ${doc.number}: ${reason}` });
   });
 }
@@ -262,6 +266,7 @@ export async function postStockCount(ctx: Ctx, countId: string) {
       });
     }
     await tx.stockCount.update({ where: { id: countId }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date() } });
+    await postStockJournal(tx, ctx, { type: "StockCount", id: c.id, no: c.number, memo: `Physical count ${c.number}` });
     await audit(tx, ctx, { action: "POST", entity: "StockCount", entityId: countId, summary: `Posted count ${c.number} with ${moves.length} variance(s)` });
     return { variances: moves.length };
   });

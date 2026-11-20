@@ -2,7 +2,7 @@
  * Executive dashboard metrics — every figure is computed from live database
  * records. Revenue is only "confirmed" when backed by posted sales invoices;
  * order intake and quotation pipeline are reported separately and labelled.
- * No profit figure is reported (no general ledger / full cost data).
+ * Net profit comes from the posted general ledger (services/accounting.ts).
  */
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";

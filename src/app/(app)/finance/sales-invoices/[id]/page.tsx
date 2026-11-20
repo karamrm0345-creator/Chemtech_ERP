@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { bankAccountOptions } from "@/components/journal-panel";
+import { JournalPanel } from "@/components/journal-panel";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -19,6 +21,7 @@ export default async function SiPage({ params }: { params: Promise<{ id: string 
   const inv = await prisma.salesInvoice.findUnique({ where: { id }, include: { customer: true, salesOrder: true, lines: true, payments: { orderBy: { date: "desc" } } } });
   if (!inv) notFound();
   const balance = D(inv.total).sub(D(inv.paidAmount));
+  const banks = await bankAccountOptions();
   const manage = user.permissions.has("finance.sales.manage");
   const overdue = ["POSTED", "PARTIALLY_PAID"].includes(inv.status) && inv.dueDate < new Date();
   return (
@@ -29,9 +32,10 @@ export default async function SiPage({ params }: { params: Promise<{ id: string 
           {inv.status === "DRAFT" && manage && <ActionButton variant="action" label="Post invoice" confirm="Posting issues the invoice and records it as revenue and a receivable. Continue?" action={postSalesInvoiceAction.bind(null, id)} />}
           {inv.status === "DRAFT" && manage && <ActionButton variant="danger" label="Cancel" confirm="Cancel this draft invoice?" action={cancelSalesInvoiceAction.bind(null, id)} />}
           {["POSTED", "PARTIALLY_PAID"].includes(inv.status) && manage && <QuickFormButton variant="action" label="Record receipt" title="Record customer payment" action={customerPaymentForInvoiceAction.bind(null, id)}
-            initial={{ amount: balance.toFixed(2), method: "BANK_TRANSFER" }} fields={[
+            initial={{ amount: balance.toFixed(2), method: "BANK_TRANSFER", accountId: banks.defaultId }} fields={[
               { name: "amount", label: `Amount (${inv.currency}), balance ${balance.toFixed(2)}`, required: true }, { name: "date", label: "Date", type: "date" },
               { name: "method", label: "Method", type: "select", required: true, options: ["BANK_TRANSFER", "CHEQUE", "CASH", "CARD", "OTHER"].map((m) => ({ value: m, label: humanize(m) })) },
+              { name: "accountId", label: "Paid through (bank / cash account)", type: "select", required: true, options: banks.options },
               { name: "reference", label: "Reference (bank ref / cheque no.)" },
             ]} />}
           <PrintButton />
@@ -53,6 +57,7 @@ export default async function SiPage({ params }: { params: Promise<{ id: string 
         </div>
         <div className="no-print space-y-4">
           <AttachmentsPanel user={user} docType="SALES_INVOICE" docId={id} />
+          <JournalPanel user={user} sourceType="SalesInvoice" sourceId={id} />
           <HistoryPanel entity="SalesInvoice" entityId={id} />
         </div>
       </div>

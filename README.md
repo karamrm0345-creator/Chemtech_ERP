@@ -7,8 +7,9 @@ Six modules share **one PostgreSQL database**:
 |---|---|
 | **General Manager dashboard** | Live KPIs (confirmed revenue vs order intake vs pipeline), purchases, inventory value, low / out of stock, open & overdue orders, pending approvals, receivables / payables; monthly trends, rankings, stock movement, slow-moving stock; actionable alerts; date / customer / supplier / category filters; every KPI links to its records |
 | **Sales** | Quotations (Draft → Submitted → Approved → Sent → Accepted/Rejected → Converted, with revisions), sales orders, availability & stock reservation, delivery orders that issue stock exactly once, shortage → purchase request, sales invoices & receipts |
-| **Procurement** | Purchase requests with approval, RFQs, supplier quotations with a weighted comparison screen, purchase orders (freight, multi-currency, partial-delivery policy), goods receipts with tolerance/rejections/batch/expiry/serial capture, returns to supplier, supplier invoices with 3-way matching & payments |
+| **Procurement** | Purchase requests with approval, RFQs, supplier quotations with a weighted comparison screen, purchase orders (freight, multi-currency, partial-delivery policy), goods receipts with tolerance/rejections/batch/expiry/serial capture, returns to supplier, supplier invoices with 3-way matching, freight and payments |
 | **Store & inventory** | Item master (product, chemical, equipment, spare part, consumable, service; stock / serialized asset / rental / non-stock), multi-warehouse with bin locations, immutable stock ledger, opening balances, adjustments (approval + limits), transfers, internal issues, physical counts, reversals, batch/lot & expiry (FEFO), serial numbers, weighted-average landed cost, stock card, low-stock replenishment |
+| **Accounting** | Chart of accounts, double-entry general ledger posted automatically by every invoice, payment and stock movement, manual journals with separation of duties, fiscal years, books lock date and year-end close, trial balance, profit & loss, balance sheet, general ledger and customer / supplier statements |
 | **Customers** | Profile, contacts, credit limit, duplicate detection, full transaction history (quotes, orders, deliveries, invoices), documents |
 | **Suppliers** | Profile, contacts, role-protected bank details, prequalification, certificates with expiry, quality issues / NCRs, delivery performance, quotation / PO / GRN / invoice history |
 
@@ -80,7 +81,7 @@ sudo -u postgres psql -c "CREATE DATABASE chemtech_erp_test OWNER chemtech;"   #
 
 cp .env.example .env            # then edit DATABASE_URL and SESSION_SECRET
 npx prisma migrate deploy        # apply migrations
-npm run db:seed:base             # roles, permissions, currencies, UoM, categories, numbering, settings
+npm run db:seed:base             # roles, permissions, currencies, UoM, categories, numbering, settings, chart of accounts
 npm run dev                      # http://localhost:3000
 ```
 
@@ -147,6 +148,7 @@ See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full guide. In short:
 npm ci
 npx prisma migrate deploy
 npm run db:seed:base          # idempotent; safe to re-run
+npm run ledger:backfill       # posts journals for documents created before accounting (idempotent)
 npm run build
 NODE_ENV=production npm start # behind HTTPS reverse proxy (nginx/Caddy), port 3000
 ```

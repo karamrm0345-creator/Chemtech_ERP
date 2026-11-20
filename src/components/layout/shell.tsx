@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import {
   Menu, X, LogOut, KeyRound, ChevronDown, Circle, LayoutDashboard, BadgeCheck, FileText, ShoppingCart, Truck, Building2, ClipboardList, Scale,
   PackageCheck, PackageOpen, Factory, Boxes, Warehouse, ArrowLeftRight, ListChecks, BookOpen, TriangleAlert, ScanBarcode, Settings2, Receipt,
-  FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History, type LucideIcon,
+  FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History, ListTree, NotebookPen, BookOpenText, Sigma, TrendingUp, Landmark, CalendarRange,
+  type LucideIcon,
 } from "lucide-react";
 import { Logo } from "./logo";
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard, BadgeCheck, FileText, ShoppingCart, Truck, Building2, ClipboardList, Scale, PackageCheck, PackageOpen, Factory, Boxes, Warehouse,
   ArrowLeftRight, ListChecks, BookOpen, TriangleAlert, ScanBarcode, Settings2, Receipt, FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History,
+  ListTree, NotebookPen, BookOpenText, Sigma, TrendingUp, Landmark, CalendarRange,
 };
 import { cn } from "@/lib/cn";
 import type { NavGroup } from "./nav";

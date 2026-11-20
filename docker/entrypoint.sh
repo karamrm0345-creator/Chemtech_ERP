@@ -18,6 +18,9 @@ node_modules/.bin/prisma migrate deploy
 echo "▶ Seeding reference data (roles, currencies, units, numbering)"
 node_modules/.bin/tsx prisma/seed-base.ts
 
+echo "▶ Posting ledger journals for documents created before accounting (skipped when up to date)"
+node_modules/.bin/tsx scripts/backfill-ledger.ts
+
 if [ "${DEMO_SEED:-0}" = "1" ]; then
   if [ -z "$DEMO_PASSWORD" ]; then
     echo "✖ DEMO_SEED=1 needs DEMO_PASSWORD (min 10 characters, letters and numbers)." >&2

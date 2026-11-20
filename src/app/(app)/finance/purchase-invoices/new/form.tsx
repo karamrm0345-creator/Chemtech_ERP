@@ -8,10 +8,10 @@ import { btn, Card } from "@/components/ui/primitives";
 
 type L = { id: string; lineNo: number; description: string; open: number; poUnit: string; taxRate: string };
 
-export function PiForm({ purchaseOrderId, currency, lines, date }: { purchaseOrderId: string; currency: string; lines: L[]; date: string }) {
+export function PiForm({ purchaseOrderId, currency, lines, date, charges }: { purchaseOrderId: string; currency: string; lines: L[]; date: string; charges: string }) {
   const router = useRouter();
   const { run, pending } = useAction();
-  const [h, setH] = useState({ supplierInvoiceNo: "", date, dueDate: "", notes: "" });
+  const [h, setH] = useState({ supplierInvoiceNo: "", date, dueDate: "", notes: "", charges });
   const [v, setV] = useState<Record<string, { quantity: string; unitPrice: string }>>(Object.fromEntries(lines.map((l) => [l.id, { quantity: String(l.open), unitPrice: l.poUnit }])));
   return (
     <form className="space-y-4" onSubmit={async (e) => {
@@ -19,10 +19,11 @@ export function PiForm({ purchaseOrderId, currency, lines, date }: { purchaseOrd
       await run(() => createPurchaseInvoiceAction({ purchaseOrderId, ...h, lines: Object.entries(v).filter(([, x]) => Number(x.quantity) > 0).map(([poLineId, x]) => ({ poLineId, ...x })) }), { redirect: (d) => `/finance/purchase-invoices/${(d as { id: string }).id}` });
     }}>
       <Card>
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-5">
           <Field label="Supplier invoice no." required><input className="input" required value={h.supplierInvoiceNo} onChange={(e) => setH({ ...h, supplierInvoiceNo: e.target.value })} /></Field>
           <Field label="Invoice date"><input type="date" className="input" value={h.date} onChange={(e) => setH({ ...h, date: e.target.value })} /></Field>
           <Field label="Due date" hint="Blank = supplier payment terms"><input type="date" className="input" value={h.dueDate} onChange={(e) => setH({ ...h, dueDate: e.target.value })} /></Field>
+          <Field label={`Freight / charges (${currency})`} hint="PO freight and other charges billed on this invoice"><input className="input text-right" inputMode="decimal" value={h.charges} onChange={(e) => setH({ ...h, charges: e.target.value })} /></Field>
           <Field label="Notes"><input className="input" value={h.notes} onChange={(e) => setH({ ...h, notes: e.target.value })} /></Field>
         </div>
       </Card>

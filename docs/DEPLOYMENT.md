@@ -27,6 +27,7 @@ sudo -u chemtech cp .env.example .env && sudo -u chemtech chmod 600 .env
 #   UPLOAD_DIR=/var/lib/chemtech/uploads     (outside the app & web root; chmod 700, owned by chemtech)
 sudo -u chemtech npx prisma migrate deploy
 sudo -u chemtech npm run db:seed:base
+sudo -u chemtech npm run ledger:backfill   # upgrades only: journals for documents created before accounting
 sudo -u chemtech npm run build
 ```
 

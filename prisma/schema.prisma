@@ -84,7 +84,7 @@ model ApprovalLimit {
 // ───────────────────────────── Settings ─────────────────────────────
 
 model CompanySettings {
-  id                 Int      @id @default(1)
+  id                 Int       @id @default(1)
   companyName        String
   companyNameAr      String?
   legalName          String?
@@ -95,18 +95,22 @@ model CompanySettings {
   email              String?
   website            String?
   logoAttachmentId   String?
-  baseCurrency       String   @default("QAR")
-  timeZone           String   @default("Asia/Qatar")
-  defaultTaxRate     Decimal  @default(0) @db.Decimal(9, 4)
-  financeEnabled     Boolean  @default(true)
-  allowNegativeStock Boolean  @default(false)
-  grnTolerancePct    Decimal  @default(0) @db.Decimal(9, 4)
-  requirePrApproval  Boolean  @default(true)
-  requireRfq         Boolean  @default(false)
-  requirePrForPo     Boolean  @default(false)
-  adjustmentAlertQty Decimal  @default(100) @db.Decimal(18, 4)
-  slowMovingDays     Int      @default(90)
-  updatedAt          DateTime @updatedAt
+  baseCurrency       String    @default("QAR")
+  timeZone           String    @default("Asia/Qatar")
+  defaultTaxRate     Decimal   @default(0) @db.Decimal(9, 4)
+  financeEnabled     Boolean   @default(true)
+  allowNegativeStock Boolean   @default(false)
+  grnTolerancePct    Decimal   @default(0) @db.Decimal(9, 4)
+  requirePrApproval  Boolean   @default(true)
+  requireRfq         Boolean   @default(false)
+  requirePrForPo     Boolean   @default(false)
+  adjustmentAlertQty Decimal   @default(100) @db.Decimal(18, 4)
+  slowMovingDays     Int       @default(90)
+  // Accounting: no postings are accepted dated on or before this day (period close).
+  booksLockedUntil   DateTime? @db.Date
+  // Tracks one-time additive grants of new permissions to the default roles.
+  permissionsVersion Int       @default(0)
+  updatedAt          DateTime  @updatedAt
 }
 
 model Currency {
@@ -862,6 +866,8 @@ model CustomerPayment {
   amount      Decimal      @db.Decimal(18, 2)
   method      String       @default("BANK_TRANSFER")
   reference   String?
+  accountId   String? // bank / cash account credited or debited
+  account     Account?     @relation(fields: [accountId], references: [id])
   createdById String
   createdAt   DateTime     @default(now())
 }
@@ -1194,6 +1200,7 @@ model PurchaseInvoice {
   matchStatus       String                @default("NOT_MATCHED") // MATCHED | VARIANCE | NOT_MATCHED
   matchNotes        String?
   subtotal          Decimal               @default(0) @db.Decimal(18, 2)
+  charges           Decimal               @default(0) @db.Decimal(18, 2) // freight / other charges billed on this invoice
   taxTotal          Decimal               @default(0) @db.Decimal(18, 2)
   total             Decimal               @default(0) @db.Decimal(18, 2)
   paidAmount        Decimal               @default(0) @db.Decimal(18, 2)
@@ -1235,6 +1242,8 @@ model SupplierPayment {
   amount      Decimal         @db.Decimal(18, 2)
   method      String          @default("BANK_TRANSFER")
   reference   String?
+  accountId   String? // bank / cash account credited or debited
+  account     Account?        @relation(fields: [accountId], references: [id])
   createdById String
   createdAt   DateTime        @default(now())
 }
@@ -1287,4 +1296,120 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@index([userId])
+}
+
+// ───────────────────────── Accounting (general ledger) ─────────────────────────
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model Account {
+  id               String            @id @default(cuid())
+  code             String            @unique
+  name             String
+  type             AccountType
+  parentId         String?
+  parent           Account?          @relation("AccountTree", fields: [parentId], references: [id])
+  children         Account[]         @relation("AccountTree")
+  isGroup          Boolean           @default(false) // group accounts only aggregate; no postings
+  isBank           Boolean           @default(false) // selectable as the bank / cash account on payments
+  description      String?
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  lines            JournalLine[]
+  defaults         AccountDefault[]
+  customerPayments CustomerPayment[]
+  supplierPayments SupplierPayment[]
+
+  @@index([type])
+  @@index([parentId])
+}
+
+// System posting accounts (receivables, inventory, sales …) keyed by role.
+model AccountDefault {
+  key       String  @id
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+}
+
+enum FiscalYearStatus {
+  OPEN
+  CLOSED
+}
+
+model FiscalYear {
+  id               String           @id @default(cuid())
+  name             String           @unique
+  startDate        DateTime         @db.Date
+  endDate          DateTime         @db.Date
+  status           FiscalYearStatus @default(OPEN)
+  closedAt         DateTime?
+  closedById       String?
+  closingJournalId String?
+  createdAt        DateTime         @default(now())
+
+  @@index([startDate, endDate])
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+// A journal voucher. Posted journals are immutable; corrections are reversing journals.
+model JournalEntry {
+  id           String        @id @default(cuid())
+  number       String        @unique
+  date         DateTime      @db.Date
+  type         String // MANUAL | SALES_INVOICE | CUSTOMER_PAYMENT | PURCHASE_INVOICE | SUPPLIER_PAYMENT | STOCK | CLOSING | OPENING | REVERSAL
+  status       JournalStatus @default(DRAFT)
+  memo         String?
+  reference    String?
+  sourceType   String? // originating document (SalesInvoice, GoodsReceipt …)
+  sourceId     String?
+  sourceNo     String?
+  sourceKind   String? // POST | REVERSE — one journal per document event
+  reversalOfId String?       @unique
+  reversalOf   JournalEntry? @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversedBy   JournalEntry? @relation("JournalReversal")
+  totalDebit   Decimal       @default(0) @db.Decimal(18, 2)
+  createdById  String
+  postedById   String?
+  postedAt     DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  lines        JournalLine[]
+
+  @@unique([sourceType, sourceId, sourceKind])
+  @@index([date])
+  @@index([type])
+  @@index([status])
+}
+
+// Ledger lines in base currency. Only lines of POSTED journals count (posted = true).
+model JournalLine {
+  id          String       @id @default(cuid())
+  journalId   String
+  journal     JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  accountId   String
+  account     Account      @relation(fields: [accountId], references: [id])
+  date        DateTime     @db.Date
+  debit       Decimal      @default(0) @db.Decimal(18, 2)
+  credit      Decimal      @default(0) @db.Decimal(18, 2)
+  partyType   String? // CUSTOMER | SUPPLIER
+  partyId     String?
+  description String?
+  posted      Boolean      @default(false)
+
+  @@index([accountId, date])
+  @@index([posted, date])
+  @@index([partyType, partyId])
 }

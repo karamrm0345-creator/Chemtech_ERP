@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
-import { prisma } from "@/server/db";
+import { prisma, type Tx } from "@/server/db";
+import { unbilledCharges } from "@/server/services/finance";
 import { PageHeader, Notice } from "@/components/ui/primitives";
 import { toDateInput } from "@/lib/format";
 import { PiForm } from "./form";
@@ -18,10 +19,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
     const net = Number(l.quantity) ? Number(l.lineTotal) / Number(l.quantity) : 0;
     return { id: l.id, lineNo: l.lineNo, description: l.description, open: Math.max(open, 0), poUnit: (Math.round(net * 100) / 100).toString(), taxRate: l.taxRate.toString() };
   }).filter((l) => l.open > 0);
+  const charges = (await unbilledCharges(prisma as unknown as Tx, po.id)).toFixed(2);
   return (
     <>
       <PageHeader title={`Supplier invoice for ${po.number}`} subtitle={po.supplier.legalName} crumbs={[{ label: "Purchase orders", href: "/purchasing/orders" }, { label: po.number, href: `/purchasing/orders/${po.id}` }, { label: "Invoice" }]} />
-      {lines.length === 0 ? <Notice>All received quantities have been invoiced.</Notice> : <PiForm purchaseOrderId={po.id} currency={po.currency} lines={lines} date={toDateInput(new Date())} />}
+      {lines.length === 0 ? <Notice>All received quantities have been invoiced.</Notice> : <PiForm purchaseOrderId={po.id} currency={po.currency} lines={lines} date={toDateInput(new Date())} charges={charges} />}
     </>
   );
 }

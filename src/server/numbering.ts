@@ -20,6 +20,7 @@ export const DOC_TYPES = {
   SUPPLIER_PAYMENT: { prefix: "PAY", includeYear: true, padding: 5 },
   STOCK_DOCUMENT: { prefix: "STK", includeYear: true, padding: 5 },
   STOCK_COUNT: { prefix: "CNT", includeYear: true, padding: 5 },
+  JOURNAL_ENTRY: { prefix: "JV", includeYear: true, padding: 5 },
 } as const;
 
 export type DocType = keyof typeof DOC_TYPES;

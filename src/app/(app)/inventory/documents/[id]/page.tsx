@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JournalPanel } from "@/components/journal-panel";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -53,6 +54,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
             </Card>
           )}
         </div>
+        <JournalPanel user={user} sourceType="StockDocument" sourceId={id} />
         <HistoryPanel entity="StockDocument" entityId={id} docType="STOCK_DOCUMENT" />
       </div>
     </>

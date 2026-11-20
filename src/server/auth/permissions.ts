@@ -54,6 +54,13 @@ export const PERMISSION_GROUPS = {
     "finance.sales.manage": "Issue sales invoices and record receipts",
     "finance.purchase.manage": "Record supplier invoices and payments",
   },
+  Accounting: {
+    "accounting.view": "View chart of accounts, ledgers and financial statements",
+    "accounting.journal.manage": "Prepare manual journal entries",
+    "accounting.journal.post": "Post and reverse manual journal entries",
+    "accounting.coa.manage": "Manage chart of accounts and posting accounts",
+    "accounting.period.close": "Close periods and fiscal years",
+  },
   Reports: {
     "reports.view": "View operational reports",
     "reports.export": "Export reports",
@@ -81,7 +88,8 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
     code: "GENERAL_MANAGER", name: "General Manager", description: "Executive overview and final approvals",
     permissions: [...view, "dashboard.executive", "dashboard.financial", "finance.view", "reports.export", "audit.view",
       "sales.quotation.approve", "sales.order.approve", "purchase.request.approve", "purchase.order.approve",
-      "inventory.adjust.approve", "supplier.bank.view", "attachment.upload"],
+      "inventory.adjust.approve", "supplier.bank.view", "attachment.upload",
+      "accounting.view", "accounting.journal.post", "accounting.period.close"],
   },
   {
     code: "SALES_MANAGER", name: "Sales Manager", description: "Manages and approves sales",
@@ -120,7 +128,8 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
   {
     code: "FINANCE_OFFICER", name: "Finance Officer", description: "Invoices, receipts and supplier payments",
     permissions: [...view, "dashboard.financial", "finance.view", "finance.sales.manage", "finance.purchase.manage",
-      "supplier.bank.view", "reports.export", "attachment.upload"],
+      "supplier.bank.view", "reports.export", "attachment.upload",
+      "accounting.view", "accounting.journal.manage", "accounting.journal.post", "accounting.coa.manage"],
   },
   {
     code: "SYSTEM_ADMIN", name: "System Administrator", description: "Users, roles and settings (no business approvals)",
@@ -128,6 +137,15 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
   },
   {
     code: "AUDITOR", name: "Read-Only Auditor", description: "Read-only access including audit trail",
-    permissions: [...view, "dashboard.executive", "dashboard.financial", "finance.view", "audit.view", "reports.export"],
+    permissions: [...view, "dashboard.executive", "dashboard.financial", "finance.view", "audit.view", "reports.export", "accounting.view"],
   },
+];
+
+/**
+ * Permissions added after the first release. The base seed grants them once to
+ * the default roles that list them, so existing installations pick them up
+ * without overwriting changes an administrator made to the roles.
+ */
+export const PERMISSION_UPGRADES: { version: number; permissions: Permission[] }[] = [
+  { version: 1, permissions: ["accounting.view", "accounting.journal.manage", "accounting.journal.post", "accounting.coa.manage", "accounting.period.close"] },
 ];

@@ -1,6 +1,7 @@
 // Reference data required in every environment (no business records, no users).
 import type { PrismaClient } from "@prisma/client";
-import { DEFAULT_ROLES } from "../src/server/auth/permissions";
+import { DEFAULT_ROLES, PERMISSION_UPGRADES } from "../src/server/auth/permissions";
+import { POSTING_KEYS, STANDARD_CHART, type PostingKey } from "../src/server/accounting/chart";
 import { DOC_TYPES } from "../src/server/numbering";
 
 export async function seedBase(prisma: PrismaClient) {
@@ -16,11 +17,37 @@ export async function seedBase(prisma: PrismaClient) {
     }
   }
 
-  await prisma.companySettings.upsert({
+  const settings = await prisma.companySettings.upsert({
     where: { id: 1 },
     create: { id: 1, companyName: "Chemtech", legalName: "Chemtech", baseCurrency: "QAR", timeZone: "Asia/Qatar" },
     update: {},
   });
+
+  // One-time grants of permissions introduced after first release, to default roles that list them.
+  for (const up of PERMISSION_UPGRADES.filter((u) => u.version > settings.permissionsVersion)) {
+    for (const r of DEFAULT_ROLES) {
+      const role = await prisma.role.findUniqueOrThrow({ where: { code: r.code } });
+      const grant = up.permissions.filter((p) => r.permissions.includes(p));
+      if (grant.length) await prisma.rolePermission.createMany({ data: grant.map((permission) => ({ roleId: role.id, permission })), skipDuplicates: true });
+    }
+    await prisma.companySettings.update({ where: { id: 1 }, data: { permissionsVersion: up.version } });
+  }
+
+  // Chart of accounts: seeded only into an empty chart, so finance's own structure is never overwritten.
+  if ((await prisma.account.count()) === 0) {
+    const ids = new Map<string, string>();
+    for (const a of STANDARD_CHART) {
+      const acc = await prisma.account.create({
+        data: { code: a.code, name: a.name, type: a.type, isGroup: !!a.group, isBank: !!a.bank, parentId: a.parent ? ids.get(a.parent) : null },
+      });
+      ids.set(a.code, acc.id);
+    }
+  }
+  for (const key of Object.keys(POSTING_KEYS) as PostingKey[]) {
+    const code = STANDARD_CHART.find((a) => a.key === key)?.code;
+    const acc = code ? await prisma.account.findUnique({ where: { code } }) : null;
+    if (acc && !(await prisma.accountDefault.findUnique({ where: { key } }))) await prisma.accountDefault.create({ data: { key, accountId: acc.id } });
+  }
 
   const currencies = [
     { code: "QAR", name: "Qatari Riyal", rateToBase: 1 },

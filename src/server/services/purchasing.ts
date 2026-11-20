@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { postStockJournal } from "../accounting/postings";
 import type { Prisma } from "@prisma/client";
 import { prisma, withTx, type Tx } from "../db";
 import { can, requirePerm, requireAny, type Ctx } from "../context";
@@ -533,6 +534,7 @@ export async function postGoodsReceipt(ctx: Ctx, grnId: string) {
     }
     await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: outstanding ? "PARTIALLY_RECEIVED" : "RECEIVED" } });
     const posted = await tx.goodsReceipt.update({ where: { id: grnId }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date() } });
+    await postStockJournal(tx, ctx, { type: "GoodsReceipt", id: grn.id, no: grn.number, memo: `Goods receipt ${grn.number} for ${po.number}` });
     await audit(tx, ctx, { action: "POST", entity: "GoodsReceipt", entityId: grnId, summary: `Posted ${grn.number} against ${po.number} (${outstanding ? "partially received" : "fully received"})` });
     return posted;
   });
@@ -596,6 +598,7 @@ export async function createAndPostPurchaseReturn(ctx: Ctx, raw: unknown) {
       await tx.purchaseOrderLine.update({ where: { id: pol.id }, data: { returnedQty: D(pol.returnedQty).add(qty) } });
     }
     if (po.status === "RECEIVED") await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: "PARTIALLY_RECEIVED" } });
+    await postStockJournal(tx, ctx, { type: "PurchaseReturn", id: ret.id, no: number, memo: `Return to supplier ${number} for ${po.number}` });
     await audit(tx, ctx, { action: "POST", entity: "PurchaseReturn", entityId: ret.id, summary: `Returned goods to supplier (${number}) against ${po.number}` });
     return ret;
   });

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JournalPanel } from "@/components/journal-panel";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -52,6 +53,7 @@ export default async function GrnPage({ params }: { params: Promise<{ id: string
         </div>
         <div className="no-print space-y-4">
           <AttachmentsPanel user={user} docType="GOODS_RECEIPT" docId={id} title="Delivery note, certificates & inspection reports" />
+          <JournalPanel user={user} sourceType="GoodsReceipt" sourceId={id} />
           <HistoryPanel entity="GoodsReceipt" entityId={id} />
         </div>
       </div>

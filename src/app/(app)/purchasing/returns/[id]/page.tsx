@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JournalPanel } from "@/components/journal-panel";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -9,7 +10,7 @@ import { PrintButton } from "@/components/print-button";
 import { fmtDate, fmtQty } from "@/lib/format";
 
 export default async function ReturnPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser("purchase.view");
+  const user = await requireUser("purchase.view");
   const { id } = await params;
   const r = await prisma.purchaseReturn.findUnique({ where: { id }, include: { lines: true, supplier: true } });
   if (!r) notFound();
@@ -28,6 +29,7 @@ export default async function ReturnPage({ params }: { params: Promise<{ id: str
           <DataTable basePath={`/purchasing/returns/${id}`} columns={[{ label: "Item" }, { label: "Qty", align: "right" }, { label: "Batch" }, { label: "Serials" }]}
             rows={r.lines.map((l) => ({ key: l.id, cells: [`${it.get(l.itemId)?.code} — ${it.get(l.itemId)?.name}`, fmtQty(l.quantity), l.batchNo, l.serialNos] }))} />
         </div>
+        <JournalPanel user={user} sourceType="PurchaseReturn" sourceId={id} />
         <HistoryPanel entity="PurchaseReturn" entityId={id} />
       </div>
     </>

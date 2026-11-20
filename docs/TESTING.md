@@ -33,14 +33,21 @@ rejected quantities → NCR, partial-delivery policy, landed cost, returns to su
 only after delivery, over-payment prevention, 3-way match variance, cancellation rules,
 concurrent document numbering, every report running, and report permissions.
 
+Accounting (`tests/accounting.test.ts`): journals for every step of the sales cycle (delivery at cost, invoice with tax,
+receipt) and purchase cycle (receipt at landed cost, supplier invoice clearing GRNI with price variance and freight, payment);
+inventory account equal to the stock ledger through transfers, adjustments and reversals; customer and supplier statements
+netting to zero; balanced trial balance and balance sheet; manual journals (balance check, separation of duties, group
+accounts refused, reversal); accounting permissions; books lock date; fiscal-year close into retained earnings and reopen;
+and a backfill + reconciliation of the whole database (ledger = stock ledger, receivables and payables = open invoices).
+
 ### Latest result
 
 ```
- Test Files  7 passed (7)
-      Tests  47 passed (47)
+ Test Files  8 passed (8)
+      Tests  55 passed (55)
 ```
 
-(run on 2026-10-17, PostgreSQL 16, Node 22)
+(run on 2026-11-20, PostgreSQL 16, Node 22)
 
 ## Browser end-to-end test (Playwright)
 
@@ -70,7 +77,18 @@ node scripts/crawl-pages.mjs gm@chemtech.demo '<password>'
 Pages were rendered at desktop (1280–1440 px) and phone width (390 px) with Playwright and
 inspected. The sidebar collapses into a drawer, KPI cards and charts stack, and tables scroll horizontally on small screens.
 
-## Latest browser results (2026-10-17, demo data)
+## Latest browser results (2026-11-20, demo data, production build)
+
+| Run | Result |
+|---|---|
+| Page crawl: General Manager | 119 pages, 0 problems (pages outside the role correctly refused) |
+| Page crawl: Finance Officer | 119 pages, 0 problems |
+| Page crawl: Read-Only Auditor | 119 pages, 0 problems |
+| Page crawl: Storekeeper | 119 pages, 0 problems (accounting refused) |
+| Manual journal prepared by Finance, posted by GM; statements reviewed | passed |
+| `npm run build` / `tsc --noEmit` / `eslint` | clean |
+
+## Earlier browser results (2026-10-17, demo data)
 
 | Run | Result |
 |---|---|
