@@ -5,6 +5,7 @@ import { unbilledCharges } from "@/server/services/finance";
 import { PageHeader, Notice } from "@/components/ui/primitives";
 import { toDateInput } from "@/lib/format";
 import { PiForm } from "./form";
+import { costCenterOptions } from "@/app/(app)/accounting/journals/accounts";
 
 export const metadata = { title: "Record supplier invoice" };
 
@@ -23,7 +24,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   return (
     <>
       <PageHeader title={`Supplier invoice for ${po.number}`} subtitle={po.supplier.legalName} crumbs={[{ label: "Purchase orders", href: "/purchasing/orders" }, { label: po.number, href: `/purchasing/orders/${po.id}` }, { label: "Invoice" }]} />
-      {lines.length === 0 ? <Notice>All received quantities have been invoiced.</Notice> : <PiForm purchaseOrderId={po.id} currency={po.currency} lines={lines} date={toDateInput(new Date())} charges={charges} />}
+      {lines.length === 0 ? <Notice>All received quantities have been invoiced.</Notice> : <PiForm purchaseOrderId={po.id} currency={po.currency} lines={lines} date={toDateInput(new Date())} charges={charges} costCenters={await costCenterOptions()} />}
     </>
   );
 }

@@ -14,13 +14,19 @@ const P = ["/dashboard", "/approvals", "/admin/users", "/admin/roles", "/admin/r
   "/customers/new", "/suppliers/new", "/inventory/items/new", "/sales/quotations/new", "/sales/orders/new", "/purchasing/requests/new", "/purchasing/orders/new",
   "/purchasing/rfqs/new", "/purchasing/supplier-quotations/new", "/inventory/documents/new",
   "/accounting/accounts", "/accounting/accounts?inactive=1", "/accounting/journals", "/accounting/journals/new", "/accounting/ledger", "/accounting/trial-balance",
-  "/accounting/profit-loss", "/accounting/balance-sheet", "/accounting/fiscal-years"];
+  "/accounting/profit-loss", "/accounting/balance-sheet", "/accounting/fiscal-years", "/accounting/cost-centers", "/accounting/tax-codes",
+  "/finance/receipts", "/finance/receipts?open=1", "/finance/receipts/new", "/finance/payments", "/finance/payments/new", "/finance/credit-notes", "/finance/debit-notes",
+  "/sales/returns", "/reports/customer-aging", "/reports/supplier-aging", "/reports/tax-summary"];
 const detail = { customer: "/customers", supplier: "/suppliers", item: "/inventory/items", salesQuotation: "/sales/quotations", salesOrder: "/sales/orders", deliveryOrder: "/sales/deliveries",
   purchaseRequest: "/purchasing/requests", rfq: "/purchasing/rfqs", supplierQuotation: "/purchasing/supplier-quotations", purchaseOrder: "/purchasing/orders", goodsReceipt: "/purchasing/receipts",
   purchaseReturn: "/purchasing/returns", stockDocument: "/inventory/documents", stockCount: "/inventory/counts", salesInvoice: "/finance/sales-invoices", purchaseInvoice: "/finance/purchase-invoices", role: "/admin/roles",
-  journalEntry: "/accounting/journals" };
+  journalEntry: "/accounting/journals", customerPayment: "/finance/receipts", supplierPayment: "/finance/payments", creditNote: "/finance/credit-notes",
+  debitNote: "/finance/debit-notes", customerReturn: "/sales/returns" };
 for (const [m, base] of Object.entries(detail)) for (const id of await ids(m)) P.push(`${base}/${id}`);
 for (const id of await ids("account", { isGroup: false }, 2)) P.push(`/accounting/ledger?account=${id}`);
+for (const id of await ids("salesInvoice", { status: { in: ["POSTED", "PARTIALLY_PAID", "PAID"] } }, 1)) P.push(`/finance/credit-notes/new?invoiceId=${id}`);
+for (const id of await ids("purchaseInvoice", { status: { in: ["POSTED", "PARTIALLY_PAID", "PAID"] } }, 1)) P.push(`/finance/debit-notes/new?invoiceId=${id}`);
+for (const id of await ids("deliveryOrder", { status: "POSTED" }, 1)) P.push(`/sales/returns/new?deliveryId=${id}`);
 const [c] = await ids("customer", {}, 1), [s] = await ids("supplier", {}, 1), [it] = await ids("item", { serialTracked: true }, 1);
 if (c) for (const t of ["contacts", "quotations", "orders", "deliveries", "invoices", "documents"]) P.push(`/customers/${c}?tab=${t}`);
 if (s) for (const t of ["contacts", "compliance", "quotations", "orders", "receipts", "invoices", "quality", "documents"]) P.push(`/suppliers/${s}?tab=${t}`);

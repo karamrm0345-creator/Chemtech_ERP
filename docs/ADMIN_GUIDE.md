@@ -47,6 +47,16 @@ Changing a user's role, deactivating them or resetting their password signs out 
   Closing books income and expense to retained earnings and locks the year. *Reopen* (latest closed year only) reverses the closing entry and is audited.
 - **Existing data**: on upgrade, `npm run ledger:backfill` (run automatically by the Docker start-up) posts journals for documents created
   before accounting was enabled. It is safe to re-run.
+- **Receipts and payments** (Finance → Customer receipts / Supplier payments): record money once per payment and allocate it to
+  one or more invoices. Anything not allocated stays on the party's account and can be allocated later from the receipt.
+  Bank and cash accounts must be marked *Bank / cash* in the chart of accounts.
+- **Withholding tax**: set the rate on the supplier (e.g. 5 % for non-resident service providers). Payments deduct it automatically;
+  pay it over to the tax authority with a manual journal from *Withholding tax payable* to the bank.
+- **Credit and debit notes** are raised from the posted invoice (or from a customer return / purchase return, which fills the quantities).
+  They are posted by finance and applied to the invoice automatically.
+- **Customer returns** need the *Receive goods returned by customers* permission (Sales Manager, Store Manager and Storekeeper by default).
+- **Tax codes** (Accounting → Tax codes): one active code per rate, pointing to its output and input tax accounts.
+- **Cost centres** (Accounting → Cost centres): divisions or projects; choose one on invoices and journal lines to get a profit & loss per cost centre.
 - Permissions added in this release are granted once to the default roles that include them; changes you made to roles are kept.
 
 ## Security notes

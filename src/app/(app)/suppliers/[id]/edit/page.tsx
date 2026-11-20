@@ -15,7 +15,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   return (
     <>
       <PageHeader title={`Edit ${s.legalName}`} crumbs={[{ label: "Suppliers", href: "/suppliers" }, { label: s.code, href: `/suppliers/${s.id}` }, { label: "Edit" }]} />
-      <SupplierForm id={s.id} initial={{ ...rest, rating: s.rating?.toString() ?? "" }} currencies={currencies} canBank={u.permissions.has("supplier.bank.manage")} />
+      <SupplierForm id={s.id} initial={{ ...rest, rating: s.rating?.toString() ?? "", withholdingRate: s.withholdingRate.toString() }} currencies={currencies} canBank={u.permissions.has("supplier.bank.manage")} />
     </>
   );
 }

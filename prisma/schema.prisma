@@ -150,13 +150,13 @@ enum CustomerCategory {
 }
 
 model Customer {
-  id              String            @id @default(cuid())
-  code            String            @unique
+  id              String               @id @default(cuid())
+  code            String               @unique
   legalName       String
   tradingName     String?
-  category        CustomerCategory  @default(OTHER)
+  category        CustomerCategory     @default(OTHER)
   classification  String? // e.g. A / B / C
-  country         String            @default("Qatar")
+  country         String               @default("Qatar")
   city            String?
   address         String?
   email           String?
@@ -164,22 +164,25 @@ model Customer {
   taxRegNo        String?
   crNumber        String?
   paymentTerms    String?
-  paymentTermDays Int               @default(30)
-  creditLimit     Decimal           @default(0) @db.Decimal(18, 2)
-  currency        String            @default("QAR")
+  paymentTermDays Int                  @default(30)
+  creditLimit     Decimal              @default(0) @db.Decimal(18, 2)
+  currency        String               @default("QAR")
   salesRepId      String?
   notes           String?
-  active          Boolean           @default(true)
-  isDemo          Boolean           @default(false)
+  active          Boolean              @default(true)
+  isDemo          Boolean              @default(false)
   createdById     String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
   contacts        CustomerContact[]
   quotations      SalesQuotation[]
   orders          SalesOrder[]
   deliveries      DeliveryOrder[]
   invoices        SalesInvoice[]
   payments        CustomerPayment[]
+  creditNotes     CreditNote[]
+  returns         CustomerReturn[]
+  allocations     CustomerAllocation[]
 
   @@index([legalName])
   @@index([active])
@@ -220,12 +223,12 @@ enum PrequalStatus {
 }
 
 model Supplier {
-  id               String              @id @default(cuid())
-  code             String              @unique
+  id               String               @id @default(cuid())
+  code             String               @unique
   legalName        String
   tradingName      String?
-  category         SupplierCategory    @default(OTHER)
-  country          String              @default("Qatar")
+  category         SupplierCategory     @default(OTHER)
+  country          String               @default("Qatar")
   city             String?
   address          String?
   email            String?
@@ -233,9 +236,10 @@ model Supplier {
   website          String?
   productsServices String?
   paymentTerms     String?
-  paymentTermDays  Int                 @default(30)
-  currency         String              @default("QAR")
+  paymentTermDays  Int                  @default(30)
+  currency         String               @default("QAR")
   taxRegNo         String?
+  withholdingRate  Decimal              @default(0) @db.Decimal(9, 4) // % withheld from payments (e.g. non-resident services)
   crNumber         String?
   // Sensitive — only returned to users holding supplier.bank.view
   bankName         String?
@@ -243,14 +247,14 @@ model Supplier {
   bankAccountNo    String?
   iban             String?
   swift            String?
-  prequalStatus    PrequalStatus       @default(NOT_STARTED)
-  rating           Decimal?            @db.Decimal(4, 2) // manual 0–5 rating
+  prequalStatus    PrequalStatus        @default(NOT_STARTED)
+  rating           Decimal?             @db.Decimal(4, 2) // manual 0–5 rating
   notes            String?
-  active           Boolean             @default(true)
-  isDemo           Boolean             @default(false)
+  active           Boolean              @default(true)
+  isDemo           Boolean              @default(false)
   createdById      String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   contacts         SupplierContact[]
   documents        SupplierDocument[]
   issues           SupplierIssue[]
@@ -259,6 +263,8 @@ model Supplier {
   receipts         GoodsReceipt[]
   invoices         PurchaseInvoice[]
   payments         SupplierPayment[]
+  debitNotes       DebitNote[]
+  allocations      SupplierAllocation[]
   rfqs             RfqSupplier[]
   preferredFor     Item[]
   returns          PurchaseReturn[]
@@ -755,6 +761,7 @@ model SalesOrderLine {
   taxAmount     Decimal             @default(0) @db.Decimal(18, 2)
   deliveredQty  Decimal             @default(0) @db.Decimal(18, 4)
   invoicedQty   Decimal             @default(0) @db.Decimal(18, 4)
+  returnedQty   Decimal             @default(0) @db.Decimal(18, 4)
   reservations  StockReservation[]
   deliveryLines DeliveryOrderLine[]
 }
@@ -785,6 +792,7 @@ model DeliveryOrder {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   lines           DeliveryOrderLine[]
+  returns         CustomerReturn[]
 
   @@index([salesOrderId])
   @@index([status])
@@ -801,6 +809,7 @@ model DeliveryOrderLine {
   quantity         Decimal        @db.Decimal(18, 4)
   batchNo          String? // optional; FEFO auto-allocation when blank
   serialNos        String?
+  returnedQty      Decimal        @default(0) @db.Decimal(18, 4)
 }
 
 enum InvoiceStatus {
@@ -812,29 +821,34 @@ enum InvoiceStatus {
 }
 
 model SalesInvoice {
-  id           String             @id @default(cuid())
-  number       String             @unique
-  date         DateTime           @default(now())
-  dueDate      DateTime
-  customerId   String
-  customer     Customer           @relation(fields: [customerId], references: [id])
-  salesOrderId String?
-  salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id])
-  currency     String             @default("QAR")
-  exchangeRate Decimal            @default(1) @db.Decimal(18, 6)
-  status       InvoiceStatus      @default(DRAFT)
-  subtotal     Decimal            @default(0) @db.Decimal(18, 2)
-  taxTotal     Decimal            @default(0) @db.Decimal(18, 2)
-  total        Decimal            @default(0) @db.Decimal(18, 2)
-  paidAmount   Decimal            @default(0) @db.Decimal(18, 2)
-  notes        String?
-  createdById  String
-  postedById   String?
-  postedAt     DateTime?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  lines        SalesInvoiceLine[]
-  payments     CustomerPayment[]
+  id             String               @id @default(cuid())
+  number         String               @unique
+  date           DateTime             @default(now())
+  dueDate        DateTime
+  customerId     String
+  customer       Customer             @relation(fields: [customerId], references: [id])
+  salesOrderId   String?
+  salesOrder     SalesOrder?          @relation(fields: [salesOrderId], references: [id])
+  currency       String               @default("QAR")
+  exchangeRate   Decimal              @default(1) @db.Decimal(18, 6)
+  status         InvoiceStatus        @default(DRAFT)
+  subtotal       Decimal              @default(0) @db.Decimal(18, 2)
+  taxTotal       Decimal              @default(0) @db.Decimal(18, 2)
+  total          Decimal              @default(0) @db.Decimal(18, 2)
+  paidAmount     Decimal              @default(0) @db.Decimal(18, 2)
+  creditedAmount Decimal              @default(0) @db.Decimal(18, 2) // part of paidAmount settled by credit notes
+  costCenterId   String?
+  costCenter     CostCenter?          @relation(fields: [costCenterId], references: [id])
+  notes          String?
+  createdById    String
+  postedById     String?
+  postedAt       DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  lines          SalesInvoiceLine[]
+  payments       CustomerPayment[]
+  creditNotes    CreditNote[]
+  allocations    CustomerAllocation[]
 
   @@index([customerId])
   @@index([status, dueDate])
@@ -853,23 +867,28 @@ model SalesInvoiceLine {
   taxRate          Decimal      @default(0) @db.Decimal(9, 4)
   lineTotal        Decimal      @db.Decimal(18, 2)
   taxAmount        Decimal      @default(0) @db.Decimal(18, 2)
+  creditedQty      Decimal      @default(0) @db.Decimal(18, 4)
 }
 
 model CustomerPayment {
-  id          String       @id @default(cuid())
-  number      String       @unique
-  date        DateTime     @default(now())
-  customerId  String
-  customer    Customer     @relation(fields: [customerId], references: [id])
-  invoiceId   String
-  invoice     SalesInvoice @relation(fields: [invoiceId], references: [id])
-  amount      Decimal      @db.Decimal(18, 2)
-  method      String       @default("BANK_TRANSFER")
-  reference   String?
-  accountId   String? // bank / cash account credited or debited
-  account     Account?     @relation(fields: [accountId], references: [id])
-  createdById String
-  createdAt   DateTime     @default(now())
+  id              String               @id @default(cuid())
+  number          String               @unique
+  date            DateTime             @default(now())
+  customerId      String
+  customer        Customer             @relation(fields: [customerId], references: [id])
+  invoiceId       String? // single-invoice payment; multi-invoice payments use allocations
+  invoice         SalesInvoice?        @relation(fields: [invoiceId], references: [id])
+  amount          Decimal              @db.Decimal(18, 2)
+  method          String               @default("BANK_TRANSFER")
+  reference       String?
+  accountId       String? // bank / cash account credited or debited
+  account         Account?             @relation(fields: [accountId], references: [id])
+  createdById     String
+  createdAt       DateTime             @default(now())
+  currency        String               @default("QAR")
+  exchangeRate    Decimal              @default(1) @db.Decimal(18, 6)
+  allocatedAmount Decimal              @default(0) @db.Decimal(18, 2)
+  allocations     CustomerAllocation[]
 }
 
 // ───────────────────────────── Procurement ─────────────────────────────
@@ -1171,17 +1190,19 @@ model PurchaseReturn {
   postedAt        DateTime?
   createdAt       DateTime             @default(now())
   lines           PurchaseReturnLine[]
+  debitNotes      DebitNote[]
 }
 
 model PurchaseReturnLine {
-  id        String         @id @default(cuid())
-  returnId  String
-  return    PurchaseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
-  poLineId  String
-  itemId    String
-  quantity  Decimal        @db.Decimal(18, 4)
-  batchNo   String?
-  serialNos String?
+  id         String         @id @default(cuid())
+  returnId   String
+  return     PurchaseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  poLineId   String
+  itemId     String
+  quantity   Decimal        @db.Decimal(18, 4)
+  batchNo    String?
+  serialNos  String?
+  debitedQty Decimal        @default(0) @db.Decimal(18, 4)
 }
 
 model PurchaseInvoice {
@@ -1204,6 +1225,9 @@ model PurchaseInvoice {
   taxTotal          Decimal               @default(0) @db.Decimal(18, 2)
   total             Decimal               @default(0) @db.Decimal(18, 2)
   paidAmount        Decimal               @default(0) @db.Decimal(18, 2)
+  debitedAmount     Decimal               @default(0) @db.Decimal(18, 2) // part of paidAmount settled by debit notes
+  costCenterId      String?
+  costCenter        CostCenter?           @relation(fields: [costCenterId], references: [id])
   notes             String?
   createdById       String
   postedById        String?
@@ -1212,6 +1236,8 @@ model PurchaseInvoice {
   updatedAt         DateTime              @updatedAt
   lines             PurchaseInvoiceLine[]
   payments          SupplierPayment[]
+  debitNotes        DebitNote[]
+  allocations       SupplierAllocation[]
 
   @@unique([supplierId, supplierInvoiceNo])
   @@index([status, dueDate])
@@ -1229,23 +1255,30 @@ model PurchaseInvoiceLine {
   taxRate     Decimal         @default(0) @db.Decimal(9, 4)
   lineTotal   Decimal         @db.Decimal(18, 2)
   taxAmount   Decimal         @default(0) @db.Decimal(18, 2)
+  debitedQty  Decimal         @default(0) @db.Decimal(18, 4)
 }
 
 model SupplierPayment {
-  id          String          @id @default(cuid())
-  number      String          @unique
-  date        DateTime        @default(now())
-  supplierId  String
-  supplier    Supplier        @relation(fields: [supplierId], references: [id])
-  invoiceId   String
-  invoice     PurchaseInvoice @relation(fields: [invoiceId], references: [id])
-  amount      Decimal         @db.Decimal(18, 2)
-  method      String          @default("BANK_TRANSFER")
-  reference   String?
-  accountId   String? // bank / cash account credited or debited
-  account     Account?        @relation(fields: [accountId], references: [id])
-  createdById String
-  createdAt   DateTime        @default(now())
+  id              String               @id @default(cuid())
+  number          String               @unique
+  date            DateTime             @default(now())
+  supplierId      String
+  supplier        Supplier             @relation(fields: [supplierId], references: [id])
+  invoiceId       String? // single-invoice payment; multi-invoice payments use allocations
+  invoice         PurchaseInvoice?     @relation(fields: [invoiceId], references: [id])
+  amount          Decimal              @db.Decimal(18, 2)
+  method          String               @default("BANK_TRANSFER")
+  reference       String?
+  accountId       String? // bank / cash account credited or debited
+  account         Account?             @relation(fields: [accountId], references: [id])
+  createdById     String
+  createdAt       DateTime             @default(now())
+  currency        String               @default("QAR")
+  exchangeRate    Decimal              @default(1) @db.Decimal(18, 6)
+  allocatedAmount Decimal              @default(0) @db.Decimal(18, 2)
+  whtRate         Decimal              @default(0) @db.Decimal(9, 4)
+  whtAmount       Decimal              @default(0) @db.Decimal(18, 2) // withheld; the bank pays amount - whtAmount
+  allocations     SupplierAllocation[]
 }
 
 // ───────────────────────────── Cross-cutting ─────────────────────────────
@@ -1326,6 +1359,8 @@ model Account {
   defaults         AccountDefault[]
   customerPayments CustomerPayment[]
   supplierPayments SupplierPayment[]
+  taxOutput        TaxCode[]         @relation("TaxOutput")
+  taxInput         TaxCode[]         @relation("TaxInput")
 
   @@index([type])
   @@index([parentId])
@@ -1395,21 +1430,223 @@ model JournalEntry {
 
 // Ledger lines in base currency. Only lines of POSTED journals count (posted = true).
 model JournalLine {
-  id          String       @id @default(cuid())
-  journalId   String
-  journal     JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
-  lineNo      Int
-  accountId   String
-  account     Account      @relation(fields: [accountId], references: [id])
-  date        DateTime     @db.Date
-  debit       Decimal      @default(0) @db.Decimal(18, 2)
-  credit      Decimal      @default(0) @db.Decimal(18, 2)
-  partyType   String? // CUSTOMER | SUPPLIER
-  partyId     String?
-  description String?
-  posted      Boolean      @default(false)
+  id           String       @id @default(cuid())
+  journalId    String
+  journal      JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  accountId    String
+  account      Account      @relation(fields: [accountId], references: [id])
+  date         DateTime     @db.Date
+  debit        Decimal      @default(0) @db.Decimal(18, 2)
+  credit       Decimal      @default(0) @db.Decimal(18, 2)
+  partyType    String? // CUSTOMER | SUPPLIER
+  partyId      String?
+  description  String?
+  posted       Boolean      @default(false)
+  costCenterId String?
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
 
   @@index([accountId, date])
   @@index([posted, date])
   @@index([partyType, partyId])
+  @@index([costCenterId])
+}
+
+// ───────────────────────── Accounting phase 2 ─────────────────────────
+
+model CostCenter {
+  id               String            @id @default(cuid())
+  code             String            @unique
+  name             String
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  lines            JournalLine[]
+  salesInvoices    SalesInvoice[]
+  purchaseInvoices PurchaseInvoice[]
+}
+
+// Tax rate → ledger accounts. Lines keep their rate; postings use the active code with that rate.
+model TaxCode {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  rate            Decimal  @db.Decimal(9, 4)
+  outputAccountId String?
+  outputAccount   Account? @relation("TaxOutput", fields: [outputAccountId], references: [id])
+  inputAccountId  String?
+  inputAccount    Account? @relation("TaxInput", fields: [inputAccountId], references: [id])
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
+
+// Settles part of a sales invoice from a receipt or a credit note (amount in the invoice currency).
+model CustomerAllocation {
+  id           String           @id @default(cuid())
+  customerId   String
+  customer     Customer         @relation(fields: [customerId], references: [id])
+  invoiceId    String
+  invoice      SalesInvoice     @relation(fields: [invoiceId], references: [id])
+  paymentId    String?
+  payment      CustomerPayment? @relation(fields: [paymentId], references: [id])
+  creditNoteId String?
+  creditNote   CreditNote?      @relation(fields: [creditNoteId], references: [id])
+  amount       Decimal          @db.Decimal(18, 2)
+  date         DateTime         @default(now())
+  createdById  String
+  createdAt    DateTime         @default(now())
+
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([creditNoteId])
+}
+
+model SupplierAllocation {
+  id          String           @id @default(cuid())
+  supplierId  String
+  supplier    Supplier         @relation(fields: [supplierId], references: [id])
+  invoiceId   String
+  invoice     PurchaseInvoice  @relation(fields: [invoiceId], references: [id])
+  paymentId   String?
+  payment     SupplierPayment? @relation(fields: [paymentId], references: [id])
+  debitNoteId String?
+  debitNote   DebitNote?       @relation(fields: [debitNoteId], references: [id])
+  amount      Decimal          @db.Decimal(18, 2)
+  date        DateTime         @default(now())
+  createdById String
+  createdAt   DateTime         @default(now())
+
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([debitNoteId])
+}
+
+// Credit note against a posted sales invoice (price allowance or returned goods).
+model CreditNote {
+  id               String               @id @default(cuid())
+  number           String               @unique
+  date             DateTime             @default(now())
+  customerId       String
+  customer         Customer             @relation(fields: [customerId], references: [id])
+  invoiceId        String
+  invoice          SalesInvoice         @relation(fields: [invoiceId], references: [id])
+  customerReturnId String?
+  customerReturn   CustomerReturn?      @relation(fields: [customerReturnId], references: [id])
+  currency         String               @default("QAR")
+  exchangeRate     Decimal              @default(1) @db.Decimal(18, 6)
+  reason           String
+  status           PostingStatus        @default(DRAFT)
+  subtotal         Decimal              @default(0) @db.Decimal(18, 2)
+  taxTotal         Decimal              @default(0) @db.Decimal(18, 2)
+  total            Decimal              @default(0) @db.Decimal(18, 2)
+  allocatedAmount  Decimal              @default(0) @db.Decimal(18, 2)
+  createdById      String
+  postedById       String?
+  postedAt         DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  lines            CreditNoteLine[]
+  allocations      CustomerAllocation[]
+
+  @@index([customerId])
+  @@index([invoiceId])
+}
+
+model CreditNoteLine {
+  id            String     @id @default(cuid())
+  creditNoteId  String
+  creditNote    CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  invoiceLineId String
+  itemId        String?
+  description   String
+  quantity      Decimal    @db.Decimal(18, 4)
+  unitPrice     Decimal    @db.Decimal(18, 4)
+  discountPct   Decimal    @default(0) @db.Decimal(9, 4)
+  taxRate       Decimal    @default(0) @db.Decimal(9, 4)
+  lineTotal     Decimal    @db.Decimal(18, 2)
+  taxAmount     Decimal    @default(0) @db.Decimal(18, 2)
+}
+
+// Debit note to a supplier against a posted supplier invoice (returned goods or price allowance).
+model DebitNote {
+  id               String               @id @default(cuid())
+  number           String               @unique
+  date             DateTime             @default(now())
+  supplierId       String
+  supplier         Supplier             @relation(fields: [supplierId], references: [id])
+  invoiceId        String
+  invoice          PurchaseInvoice      @relation(fields: [invoiceId], references: [id])
+  purchaseReturnId String?
+  purchaseReturn   PurchaseReturn?      @relation(fields: [purchaseReturnId], references: [id])
+  supplierRef      String? // supplier's own credit note number
+  currency         String               @default("QAR")
+  exchangeRate     Decimal              @default(1) @db.Decimal(18, 6)
+  reason           String
+  status           PostingStatus        @default(DRAFT)
+  subtotal         Decimal              @default(0) @db.Decimal(18, 2)
+  taxTotal         Decimal              @default(0) @db.Decimal(18, 2)
+  total            Decimal              @default(0) @db.Decimal(18, 2)
+  allocatedAmount  Decimal              @default(0) @db.Decimal(18, 2)
+  createdById      String
+  postedById       String?
+  postedAt         DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  lines            DebitNoteLine[]
+  allocations      SupplierAllocation[]
+
+  @@index([supplierId])
+  @@index([invoiceId])
+}
+
+model DebitNoteLine {
+  id            String    @id @default(cuid())
+  debitNoteId   String
+  debitNote     DebitNote @relation(fields: [debitNoteId], references: [id], onDelete: Cascade)
+  invoiceLineId String
+  returnLineId  String? // purchase return line when the note is for returned goods
+  itemId        String?
+  description   String
+  quantity      Decimal   @db.Decimal(18, 4)
+  unitPrice     Decimal   @db.Decimal(18, 4)
+  taxRate       Decimal   @default(0) @db.Decimal(9, 4)
+  lineTotal     Decimal   @db.Decimal(18, 2)
+  taxAmount     Decimal   @default(0) @db.Decimal(18, 2)
+}
+
+// Goods returned by a customer against a posted delivery (stock back in at the original issue cost).
+model CustomerReturn {
+  id           String               @id @default(cuid())
+  number       String               @unique
+  date         DateTime             @default(now())
+  customerId   String
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  deliveryId   String
+  delivery     DeliveryOrder        @relation(fields: [deliveryId], references: [id])
+  salesOrderId String
+  warehouseId  String
+  reason       String
+  status       PostingStatus        @default(POSTED)
+  createdById  String
+  postedById   String?
+  postedAt     DateTime?
+  createdAt    DateTime             @default(now())
+  lines        CustomerReturnLine[]
+  creditNotes  CreditNote[]
+
+  @@index([customerId])
+  @@index([deliveryId])
+}
+
+model CustomerReturnLine {
+  id             String         @id @default(cuid())
+  returnId       String
+  return         CustomerReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  deliveryLineId String
+  soLineId       String
+  itemId         String
+  description    String
+  quantity       Decimal        @db.Decimal(18, 4)
+  batchNo        String?
+  serialNos      String?
+  creditedQty    Decimal        @default(0) @db.Decimal(18, 4)
 }

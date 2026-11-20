@@ -212,7 +212,7 @@ describe("Fiscal years and period close", () => {
 });
 
 describe("Ledger reconciliation", () => {
-  it("backfills older documents and reconciles inventory, receivables and payables to their sub-ledgers", async () => {
+  it("backfills older documents and reconciles inventory, receivables and payables (less unallocated credits) to their sub-ledgers", async () => {
     const { backfillLedger } = await import("@/server/accounting/backfill");
     await backfillLedger();
     // One statement = one snapshot, so documents posted concurrently by other test files cannot skew the comparison.
@@ -222,9 +222,13 @@ describe("Ledger reconciliation", () => {
         (SELECT COALESCE(SUM(l.debit - l.credit), 0) FROM "JournalLine" l JOIN "AccountDefault" d ON d."accountId" = l."accountId" AND d.key = 'INVENTORY' WHERE l.posted)::text AS inv_gl,
         (SELECT COALESCE(SUM("totalValue"), 0) FROM "InventoryTransaction")::text AS inv_sl,
         (SELECT COALESCE(SUM(l.debit - l.credit), 0) FROM "JournalLine" l JOIN "AccountDefault" d ON d."accountId" = l."accountId" AND d.key = 'AR' WHERE l.posted AND l."partyType" = 'CUSTOMER')::text AS ar_gl,
-        (SELECT COALESCE(SUM(ROUND((total - "paidAmount") * "exchangeRate", 2)), 0) FROM "SalesInvoice" WHERE status IN ('POSTED', 'PARTIALLY_PAID', 'PAID'))::text AS ar_sl,
+        ((SELECT COALESCE(SUM(ROUND((total - "paidAmount") * "exchangeRate", 2)), 0) FROM "SalesInvoice" WHERE status IN ('POSTED', 'PARTIALLY_PAID', 'PAID'))
+          - (SELECT COALESCE(SUM(ROUND((amount - "allocatedAmount") * "exchangeRate", 2)), 0) FROM "CustomerPayment")
+          - (SELECT COALESCE(SUM(ROUND((total - "allocatedAmount") * "exchangeRate", 2)), 0) FROM "CreditNote" WHERE status = 'POSTED'))::text AS ar_sl,
         (SELECT COALESCE(SUM(l.credit - l.debit), 0) FROM "JournalLine" l JOIN "AccountDefault" d ON d."accountId" = l."accountId" AND d.key = 'AP' WHERE l.posted AND l."partyType" = 'SUPPLIER')::text AS ap_gl,
-        (SELECT COALESCE(SUM(ROUND((total - "paidAmount") * "exchangeRate", 2)), 0) FROM "PurchaseInvoice" WHERE status IN ('POSTED', 'PARTIALLY_PAID', 'PAID'))::text AS ap_sl`;
+        ((SELECT COALESCE(SUM(ROUND((total - "paidAmount") * "exchangeRate", 2)), 0) FROM "PurchaseInvoice" WHERE status IN ('POSTED', 'PARTIALLY_PAID', 'PAID'))
+          - (SELECT COALESCE(SUM(ROUND((amount - "allocatedAmount") * "exchangeRate", 2)), 0) FROM "SupplierPayment")
+          - (SELECT COALESCE(SUM(ROUND((total - "allocatedAmount") * "exchangeRate", 2)), 0) FROM "DebitNote" WHERE status = 'POSTED'))::text AS ap_sl`;
     expect(Number(r.tb)).toBe(0);
     expect(Number(r.inv_gl)).toBe(Number(r.inv_sl));
     expect(Number(r.ar_gl)).toBeCloseTo(Number(r.ar_sl), 2);

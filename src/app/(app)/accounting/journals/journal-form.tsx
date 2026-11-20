@@ -8,13 +8,14 @@ import { Field, FormActions, Select } from "@/components/forms/fields";
 import { EntityPicker } from "@/components/forms/entity-picker";
 import { btn, Card } from "@/components/ui/primitives";
 
-type Line = { accountId: string; debit: string; credit: string; partyType: string; partyId: string; partyLabel?: string; description: string };
-const blank = (): Line => ({ accountId: "", debit: "", credit: "", partyType: "", partyId: "", description: "" });
+type Line = { accountId: string; debit: string; credit: string; partyType: string; partyId: string; partyLabel?: string; description: string; costCenterId: string };
+const blank = (): Line => ({ accountId: "", debit: "", credit: "", partyType: "", partyId: "", description: "", costCenterId: "" });
 const n = (v: string) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-export function JournalForm({ id, accounts, initial }: {
+export function JournalForm({ id, accounts, costCenters = [], initial }: {
   id?: string;
   accounts: { value: string; label: string }[];
+  costCenters?: { value: string; label: string }[];
   initial: { date: string; memo: string; reference: string; type: string; lines: Line[] };
 }) {
   const router = useRouter();
@@ -43,7 +44,7 @@ export function JournalForm({ id, accounts, initial }: {
       <Card bodyClass="p-0">
         <div className="overflow-x-auto">
           <table className="table-base">
-            <thead><tr><th>#</th><th className="min-w-[16rem]">Account</th><th className="min-w-[14rem]">Party (optional)</th><th>Description</th><th className="w-32 text-right">Debit</th><th className="w-32 text-right">Credit</th><th /></tr></thead>
+            <thead><tr><th>#</th><th className="min-w-[16rem]">Account</th><th className="min-w-[14rem]">Party (optional)</th><th>Description</th>{costCenters.length > 0 && <th>Cost centre</th>}<th className="w-32 text-right">Debit</th><th className="w-32 text-right">Credit</th><th /></tr></thead>
             <tbody>{lines.map((l, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
@@ -57,6 +58,7 @@ export function JournalForm({ id, accounts, initial }: {
                   </div>
                 </td>
                 <td><input className="input" value={l.description} onChange={(e) => set(i, { description: e.target.value })} maxLength={300} /></td>
+                {costCenters.length > 0 && <td><Select value={l.costCenterId} onChange={(v) => set(i, { costCenterId: v })} options={costCenters} placeholder="—" /></td>}
                 <td><input className="input text-right" inputMode="decimal" value={l.debit} onChange={(e) => set(i, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} /></td>
                 <td><input className="input text-right" inputMode="decimal" value={l.credit} onChange={(e) => set(i, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} /></td>
                 <td><button type="button" className="rounded p-1 text-ink-soft hover:text-red-600" aria-label="Remove line" onClick={() => setLines(lines.length > 2 ? lines.filter((_, j) => j !== i) : lines)}><Trash2 className="h-4 w-4" /></button></td>
@@ -64,10 +66,10 @@ export function JournalForm({ id, accounts, initial }: {
             ))}</tbody>
             <tfoot>
               <tr className="font-semibold">
-                <td colSpan={4}><button type="button" className={btn("outline", "py-1 text-xs")} onClick={() => setLines([...lines, blank()])}><Plus className="h-3.5 w-3.5" /> Add line</button></td>
+                <td colSpan={costCenters.length ? 5 : 4}><button type="button" className={btn("outline", "py-1 text-xs")} onClick={() => setLines([...lines, blank()])}><Plus className="h-3.5 w-3.5" /> Add line</button></td>
                 <td className="num">{totals.dr.toFixed(2)}</td><td className="num">{totals.cr.toFixed(2)}</td><td />
               </tr>
-              {totals.diff !== 0 && <tr><td colSpan={7} className="text-right text-sm font-semibold text-red-600">Out of balance by {Math.abs(totals.diff).toFixed(2)} — it must balance before it can be posted.</td></tr>}
+              {totals.diff !== 0 && <tr><td colSpan={costCenters.length ? 8 : 7} className="text-right text-sm font-semibold text-red-600">Out of balance by {Math.abs(totals.diff).toFixed(2)} — it must balance before it can be posted.</td></tr>}
             </tfoot>
           </table>
         </div>

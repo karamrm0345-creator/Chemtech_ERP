@@ -3,15 +3,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPurchaseInvoiceAction } from "@/app/actions/finance";
 import { useAction } from "@/components/forms/use-action";
-import { Field, FormActions } from "@/components/forms/fields";
+import { Field, FormActions, Select } from "@/components/forms/fields";
 import { btn, Card } from "@/components/ui/primitives";
 
 type L = { id: string; lineNo: number; description: string; open: number; poUnit: string; taxRate: string };
 
-export function PiForm({ purchaseOrderId, currency, lines, date, charges }: { purchaseOrderId: string; currency: string; lines: L[]; date: string; charges: string }) {
+export function PiForm({ purchaseOrderId, currency, lines, date, charges, costCenters = [] }: { purchaseOrderId: string; currency: string; lines: L[]; date: string; charges: string; costCenters?: { value: string; label: string }[] }) {
   const router = useRouter();
   const { run, pending } = useAction();
-  const [h, setH] = useState({ supplierInvoiceNo: "", date, dueDate: "", notes: "", charges });
+  const [h, setH] = useState({ supplierInvoiceNo: "", date, dueDate: "", notes: "", charges, costCenterId: "" });
   const [v, setV] = useState<Record<string, { quantity: string; unitPrice: string }>>(Object.fromEntries(lines.map((l) => [l.id, { quantity: String(l.open), unitPrice: l.poUnit }])));
   return (
     <form className="space-y-4" onSubmit={async (e) => {
@@ -24,6 +24,7 @@ export function PiForm({ purchaseOrderId, currency, lines, date, charges }: { pu
           <Field label="Invoice date"><input type="date" className="input" value={h.date} onChange={(e) => setH({ ...h, date: e.target.value })} /></Field>
           <Field label="Due date" hint="Blank = supplier payment terms"><input type="date" className="input" value={h.dueDate} onChange={(e) => setH({ ...h, dueDate: e.target.value })} /></Field>
           <Field label={`Freight / charges (${currency})`} hint="PO freight and other charges billed on this invoice"><input className="input text-right" inputMode="decimal" value={h.charges} onChange={(e) => setH({ ...h, charges: e.target.value })} /></Field>
+          {costCenters.length > 0 && <Field label="Cost centre" hint="For services and non-stock purchases"><Select value={h.costCenterId} onChange={(v) => setH({ ...h, costCenterId: v })} options={costCenters} placeholder="—" /></Field>}
           <Field label="Notes"><input className="input" value={h.notes} onChange={(e) => setH({ ...h, notes: e.target.value })} /></Field>
         </div>
       </Card>

@@ -94,7 +94,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Kpi label="Overdue invoices" value={k.finance.overdueCount} sub={fmtMoney(k.finance.overdueAmount)} href="/finance/sales-invoices?status=OVERDUE" tone={k.finance.overdueCount ? "red" : "green"} />
           <Kpi label="Supplier payables" value={fmtMoney(k.finance.payables)} href="/finance/purchase-invoices?status=OPEN" />
           {profit !== null
-            ? <Kpi label={profit.isNeg() ? "Net loss (ledger)" : "Net profit (ledger)"} value={fmtMoney(profit)} sub="Posted income less expenses for the period" href={`/accounting/profit-loss?from=${toDateInput(r.from)}&to=${toDateInput(r.to)}`} tone={profit.isNeg() ? "red" : "green"} />
+            ? <Kpi label={profit.lt(0) ? "Net loss (ledger)" : "Net profit (ledger)"} value={fmtMoney(profit)} sub="Posted income less expenses for the period" href={`/accounting/profit-loss?from=${toDateInput(r.from)}&to=${toDateInput(r.to)}`} tone={profit.lt(0) ? "red" : "green"} />
             : <Kpi label="Profit" value={<span className="text-base font-semibold text-ink-muted">Restricted</span>} sub="Needs the accounting view permission" />}
         </div>
       ) : (

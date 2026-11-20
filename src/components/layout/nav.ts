@@ -12,6 +12,7 @@ export const NAV: NavGroup[] = [
     { label: "Quotations", href: "/sales/quotations", perm: ["sales.view"], icon: "FileText" },
     { label: "Sales orders", href: "/sales/orders", perm: ["sales.view"], icon: "ShoppingCart" },
     { label: "Deliveries", href: "/sales/deliveries", perm: ["sales.view"], icon: "Truck" },
+    { label: "Customer returns", href: "/sales/returns", perm: ["sales.view"], icon: "Undo2" },
     { label: "Customers", href: "/customers", perm: ["customer.view"], icon: "Building2" },
   ] },
   { label: "Procurement", items: [
@@ -33,7 +34,11 @@ export const NAV: NavGroup[] = [
   ] },
   { label: "Finance", items: [
     { label: "Sales invoices", href: "/finance/sales-invoices", perm: ["finance.view"], icon: "Receipt" },
+    { label: "Customer receipts", href: "/finance/receipts", perm: ["finance.view"], icon: "HandCoins" },
+    { label: "Credit notes", href: "/finance/credit-notes", perm: ["finance.view"], icon: "ReceiptText" },
     { label: "Supplier invoices", href: "/finance/purchase-invoices", perm: ["finance.view"], icon: "FileSpreadsheet" },
+    { label: "Supplier payments", href: "/finance/payments", perm: ["finance.view"], icon: "Banknote" },
+    { label: "Debit notes", href: "/finance/debit-notes", perm: ["finance.view"], icon: "FileMinus" },
   ] },
   { label: "Accounting", items: [
     { label: "Chart of accounts", href: "/accounting/accounts", perm: ["accounting.view"], icon: "ListTree" },
@@ -42,6 +47,8 @@ export const NAV: NavGroup[] = [
     { label: "Trial balance", href: "/accounting/trial-balance", perm: ["accounting.view"], icon: "Sigma" },
     { label: "Profit & loss", href: "/accounting/profit-loss", perm: ["accounting.view"], icon: "TrendingUp" },
     { label: "Balance sheet", href: "/accounting/balance-sheet", perm: ["accounting.view"], icon: "Landmark" },
+    { label: "Cost centres", href: "/accounting/cost-centers", perm: ["accounting.view"], icon: "Network" },
+    { label: "Tax codes", href: "/accounting/tax-codes", perm: ["accounting.view"], icon: "Percent" },
     { label: "Fiscal years", href: "/accounting/fiscal-years", perm: ["accounting.view"], icon: "CalendarRange" },
   ] },
   { label: "Insight", items: [

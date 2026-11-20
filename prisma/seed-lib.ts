@@ -44,8 +44,13 @@ export async function seedBase(prisma: PrismaClient) {
     }
   }
   for (const key of Object.keys(POSTING_KEYS) as PostingKey[]) {
-    const code = STANDARD_CHART.find((a) => a.key === key)?.code;
-    const acc = code ? await prisma.account.findUnique({ where: { code } }) : null;
+    const std = STANDARD_CHART.find((a) => a.key === key);
+    let acc = std ? await prisma.account.findUnique({ where: { code: std.code } }) : null;
+    // Upgrades: posting accounts added in later releases are created in an existing chart when their code is free.
+    if (std && !acc && !(await prisma.accountDefault.findUnique({ where: { key } }))) {
+      const parent = std.parent ? await prisma.account.findUnique({ where: { code: std.parent } }) : null;
+      acc = await prisma.account.create({ data: { code: std.code, name: std.name, type: std.type, parentId: parent?.isGroup ? parent.id : null } });
+    }
     if (acc && !(await prisma.accountDefault.findUnique({ where: { key } }))) await prisma.accountDefault.create({ data: { key, accountId: acc.id } });
   }
 

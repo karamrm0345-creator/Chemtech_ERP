@@ -9,6 +9,12 @@ import { prisma } from "../db";
 import { requirePerm, can, type Ctx } from "../context";
 import { D, ZERO, round2 } from "@/lib/decimal";
 
+/** Posted sales net of tax in base currency: invoices positive, credit notes negative. */
+export const NET_SALES = Prisma.sql`(
+  SELECT 'INV' kind, date, "customerId", subtotal * "exchangeRate" base FROM "SalesInvoice" WHERE status IN ('POSTED','PARTIALLY_PAID','PAID')
+  UNION ALL
+  SELECT 'CN' kind, date, "customerId", -subtotal * "exchangeRate" base FROM "CreditNote" WHERE status = 'POSTED')`;
+
 export interface DashboardFilter {
   from: Date;
   to: Date;
@@ -29,9 +35,10 @@ export async function getKpis(ctx: Ctx, f: DashboardFilter) {
   const cust = f.customerId ? Prisma.sql`AND "customerId" = ${f.customerId}` : Prisma.empty;
   const supp = f.supplierId ? Prisma.sql`AND "supplierId" = ${f.supplierId}` : Prisma.empty;
 
+  // Confirmed revenue: posted invoices less posted credit notes, net of tax.
   const [revenue] = await prisma.$queryRaw<{ v: unknown; c: unknown }[]>`
-    SELECT COALESCE(SUM(subtotal * "exchangeRate"), 0) v, COUNT(*) c FROM "SalesInvoice"
-    WHERE status IN ('POSTED','PARTIALLY_PAID','PAID') AND date >= ${f.from} AND date <= ${f.to} ${cust}`;
+    SELECT COALESCE(SUM(base), 0) v, COUNT(*) FILTER (WHERE kind = 'INV') c FROM ${NET_SALES} rev
+    WHERE date >= ${f.from} AND date <= ${f.to} ${cust}`;
   const [intake] = await prisma.$queryRaw<{ v: unknown; c: unknown }[]>`
     SELECT COALESCE(SUM((subtotal - "discountTotal") * "exchangeRate"), 0) v, COUNT(*) c FROM "SalesOrder"
     WHERE status IN ('APPROVED','PARTIALLY_DELIVERED','DELIVERED','CLOSED') AND date >= ${f.from} AND date <= ${f.to} ${cust}`;
@@ -123,8 +130,8 @@ export async function getCharts(ctx: Ctx, f: DashboardFilter) {
 
   const [invByMonth, soByMonth, poByMonth] = await Promise.all([
     prisma.$queryRaw<{ m: string; v: unknown }[]>`
-      SELECT ${month(Prisma.sql`date`)} m, SUM(subtotal * "exchangeRate") v FROM "SalesInvoice"
-      WHERE status IN ('POSTED','PARTIALLY_PAID','PAID') AND date >= ${f.from} AND date <= ${f.to} ${cust} GROUP BY 1`,
+      SELECT ${month(Prisma.sql`date`)} m, SUM(base) v FROM ${NET_SALES} rev
+      WHERE date >= ${f.from} AND date <= ${f.to} ${cust} GROUP BY 1`,
     prisma.$queryRaw<{ m: string; v: unknown }[]>`
       SELECT ${month(Prisma.sql`date`)} m, SUM((subtotal - "discountTotal") * "exchangeRate") v FROM "SalesOrder"
       WHERE status IN ('APPROVED','PARTIALLY_DELIVERED','DELIVERED','CLOSED') AND date >= ${f.from} AND date <= ${f.to} ${cust} GROUP BY 1`,

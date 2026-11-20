@@ -11,8 +11,8 @@ import { audit } from "../audit";
 import { nextNumber } from "../numbering";
 import { AppError } from "../errors";
 import { nonNegDecimal, optDate, optId, optStr, posDecimal, reqStr } from "@/lib/validation";
-import { accountId as postingAccount } from "../accounting/ledger";
-import { postCustomerPaymentJournal, postPurchaseInvoiceJournal, postSalesInvoiceJournal, postSupplierPaymentJournal } from "../accounting/postings";
+import { postPurchaseInvoiceJournal, postSalesInvoiceJournal } from "../accounting/postings";
+import { assertCostCenters } from "./accounting";
 import { D, ZERO, calcLine, round2 } from "@/lib/decimal";
 import { assertStatus, getSettings, lockRow, orderBy, paging, type ListArgs } from "./common";
 
@@ -25,6 +25,7 @@ async function assertFinance(tx: Tx) {
 
 export const salesInvoiceSchema = z.object({
   salesOrderId: reqStr(40),
+  costCenterId: optId,
   date: optDate,
   notes: optStr(2000),
   lines: z.array(z.object({ salesOrderLineId: reqStr(40), quantity: posDecimal })).min(1, "Add at least one line"),
@@ -41,9 +42,10 @@ async function invoiceable(tx: Tx, soId: string) {
   return so.lines.map((l) => {
     const it = l.itemId ? items.get(l.itemId) : undefined;
     const stocked = !!it && it.itemType !== "SERVICE" && it.inventoryClass !== "NON_STOCK";
-    const cap = stocked ? D(l.deliveredQty) : D(l.quantity);
+    const cap = stocked ? D(l.deliveredQty).sub(D(l.returnedQty)) : D(l.quantity);
     const pend = D(drafts.find((x) => x.salesOrderLineId === l.id)?._sum.quantity);
-    return { line: l, invoiceable: cap.sub(D(l.invoicedQty)).sub(pend) };
+    const open = cap.sub(D(l.invoicedQty)).sub(pend);
+    return { line: l, invoiceable: open.lt(0) ? ZERO : open };
   });
 }
 
@@ -58,6 +60,7 @@ export async function createSalesInvoice(ctx: Ctx, raw: unknown) {
     await assertFinance(tx);
     await lockRow(tx, "SalesOrder", d.salesOrderId);
     const so = await tx.salesOrder.findUniqueOrThrow({ where: { id: d.salesOrderId }, include: { customer: true } });
+    await assertCostCenters(tx, [d.costCenterId]);
     assertStatus(so.status, ["APPROVED", "PARTIALLY_DELIVERED", "DELIVERED", "CLOSED"], "invoice");
     const inv = await invoiceable(tx, so.id);
     const lines = d.lines.map((x) => {
@@ -77,7 +80,7 @@ export async function createSalesInvoice(ctx: Ctx, raw: unknown) {
     const invc = await tx.salesInvoice.create({
       data: {
         number, date, dueDate: new Date(date.getTime() + so.customer.paymentTermDays * 86_400_000), customerId: so.customerId, salesOrderId: so.id,
-        currency: so.currency, exchangeRate: so.exchangeRate, subtotal, taxTotal, total: subtotal.add(taxTotal), notes: d.notes, createdById: ctx.userId,
+        currency: so.currency, exchangeRate: so.exchangeRate, subtotal, taxTotal, total: subtotal.add(taxTotal), notes: d.notes, costCenterId: d.costCenterId, createdById: ctx.userId,
         lines: { create: lines },
       },
     });
@@ -114,40 +117,7 @@ export async function cancelSalesInvoice(ctx: Ctx, id: string) {
   });
 }
 
-export const paymentSchema = z.object({
-  invoiceId: reqStr(40), amount: posDecimal, date: optDate,
-  method: z.enum(["BANK_TRANSFER", "CHEQUE", "CASH", "CARD", "OTHER"]).default("BANK_TRANSFER"), reference: optStr(100),
-  accountId: optId,
-});
-
-/** The bank / cash account a payment goes through: the one chosen, or the default for its method. */
-async function paymentAccount(tx: Tx, accountId: string | undefined, method: string) {
-  if (!accountId) return postingAccount(tx, method === "CASH" ? "CASH" : "BANK");
-  const a = await tx.account.findUnique({ where: { id: accountId } });
-  if (!a || !a.isBank || !a.active || a.isGroup) throw new AppError("Choose an active bank or cash account.");
-  return a.id;
-}
-
-export async function recordCustomerPayment(ctx: Ctx, raw: unknown) {
-  requirePerm(ctx, "finance.sales.manage");
-  const d = paymentSchema.parse(raw);
-  return withTx(async (tx) => {
-    await assertFinance(tx);
-    await lockRow(tx, "SalesInvoice", d.invoiceId);
-    const inv = await tx.salesInvoice.findUniqueOrThrow({ where: { id: d.invoiceId } });
-    assertStatus(inv.status, ["POSTED", "PARTIALLY_PAID"], "record payment");
-    const balance = D(inv.total).sub(D(inv.paidAmount));
-    if (D(d.amount).gt(balance)) throw new AppError(`Payment exceeds the outstanding balance (${balance}).`);
-    const number = await nextNumber(tx, "CUSTOMER_PAYMENT");
-    const accountId = await paymentAccount(tx, d.accountId, d.method);
-    const p = await tx.customerPayment.create({ data: { number, invoiceId: inv.id, customerId: inv.customerId, amount: D(d.amount), date: d.date ?? new Date(), method: d.method, reference: d.reference, accountId, createdById: ctx.userId } });
-    await postCustomerPaymentJournal(tx, ctx, p.id);
-    const paid = D(inv.paidAmount).add(D(d.amount));
-    await tx.salesInvoice.update({ where: { id: inv.id }, data: { paidAmount: paid, status: paid.gte(D(inv.total)) ? "PAID" : "PARTIALLY_PAID" } });
-    await audit(tx, ctx, { action: "CREATE", entity: "CustomerPayment", entityId: p.id, summary: `Receipt ${number}: ${d.amount} against ${inv.number}` });
-    return p;
-  });
-}
+export { recordCustomerPayment, recordSupplierPayment, paymentSchema } from "./payments";
 
 // ───────── Purchase invoices ─────────
 
@@ -158,6 +128,7 @@ export const purchaseInvoiceSchema = z.object({
   dueDate: optDate,
   notes: optStr(2000),
   charges: nonNegDecimal.default("0"), // freight / other charges billed on this invoice
+  costCenterId: optId,
   lines: z.array(z.object({ poLineId: reqStr(40), quantity: posDecimal, unitPrice: posDecimal })).min(1),
 });
 
@@ -166,7 +137,7 @@ export async function unbilledCharges(tx: Tx, poId: string) {
   const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id: poId } });
   const billed = await tx.purchaseInvoice.aggregate({ where: { purchaseOrderId: poId, status: { not: "CANCELLED" } }, _sum: { charges: true } });
   const open = D(po.freight).add(D(po.otherCharges)).sub(D(billed._sum.charges));
-  return open.isNeg() ? ZERO : open;
+  return open.lt(0) ? ZERO : open;
 }
 
 /**
@@ -180,6 +151,7 @@ export async function createPurchaseInvoice(ctx: Ctx, raw: unknown) {
     await assertFinance(tx);
     await lockRow(tx, "PurchaseOrder", d.purchaseOrderId);
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id: d.purchaseOrderId }, include: { lines: true, supplier: true } });
+    await assertCostCenters(tx, [d.costCenterId]);
     assertStatus(po.status, ["APPROVED", "PARTIALLY_RECEIVED", "RECEIVED", "CLOSED"], "invoice");
     const notes: string[] = [];
     const lines = d.lines.map((x) => {
@@ -205,7 +177,7 @@ export async function createPurchaseInvoice(ctx: Ctx, raw: unknown) {
         number, supplierInvoiceNo: d.supplierInvoiceNo, date, dueDate: d.dueDate ?? new Date(date.getTime() + po.supplier.paymentTermDays * 86_400_000),
         supplierId: po.supplierId, purchaseOrderId: po.id, currency: po.currency, exchangeRate: po.exchangeRate,
         matchStatus: notes.length ? "VARIANCE" : "MATCHED", matchNotes: notes.join("; ") || null,
-        subtotal, charges, taxTotal, total: subtotal.add(charges).add(taxTotal), notes: d.notes, createdById: ctx.userId, lines: { create: lines },
+        subtotal, charges, taxTotal, total: subtotal.add(charges).add(taxTotal), notes: d.notes, costCenterId: d.costCenterId, createdById: ctx.userId, lines: { create: lines },
       },
     });
     await audit(tx, ctx, { action: "CREATE", entity: "PurchaseInvoice", entityId: inv.id, summary: `Recorded supplier invoice ${d.supplierInvoiceNo} (${number}) — ${inv.matchStatus}` });
@@ -229,27 +201,6 @@ export async function postPurchaseInvoice(ctx: Ctx, id: string, varianceJustific
     await tx.purchaseInvoice.update({ where: { id }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date() } });
     await postPurchaseInvoiceJournal(tx, ctx, id);
     await audit(tx, ctx, { action: "POST", entity: "PurchaseInvoice", entityId: id, summary: `Posted supplier invoice ${inv.number}${inv.matchStatus === "VARIANCE" ? ` with accepted variance — ${varianceJustification}` : ""}` });
-  });
-}
-
-export async function recordSupplierPayment(ctx: Ctx, raw: unknown) {
-  requirePerm(ctx, "finance.purchase.manage");
-  const d = paymentSchema.parse(raw);
-  return withTx(async (tx) => {
-    await assertFinance(tx);
-    await lockRow(tx, "PurchaseInvoice", d.invoiceId);
-    const inv = await tx.purchaseInvoice.findUniqueOrThrow({ where: { id: d.invoiceId } });
-    assertStatus(inv.status, ["POSTED", "PARTIALLY_PAID"], "record payment");
-    const balance = D(inv.total).sub(D(inv.paidAmount));
-    if (D(d.amount).gt(balance)) throw new AppError(`Payment exceeds the outstanding balance (${balance}).`);
-    const number = await nextNumber(tx, "SUPPLIER_PAYMENT");
-    const accountId = await paymentAccount(tx, d.accountId, d.method);
-    const p = await tx.supplierPayment.create({ data: { number, invoiceId: inv.id, supplierId: inv.supplierId, amount: D(d.amount), date: d.date ?? new Date(), method: d.method, reference: d.reference, accountId, createdById: ctx.userId } });
-    await postSupplierPaymentJournal(tx, ctx, p.id);
-    const paid = D(inv.paidAmount).add(D(d.amount));
-    await tx.purchaseInvoice.update({ where: { id: inv.id }, data: { paidAmount: paid, status: paid.gte(D(inv.total)) ? "PAID" : "PARTIALLY_PAID" } });
-    await audit(tx, ctx, { action: "CREATE", entity: "SupplierPayment", entityId: p.id, summary: `Payment ${number}: ${d.amount} against ${inv.number}` });
-    return p;
   });
 }
 

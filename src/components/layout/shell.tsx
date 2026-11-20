@@ -6,14 +6,14 @@ import {
   Menu, X, LogOut, KeyRound, ChevronDown, Circle, LayoutDashboard, BadgeCheck, FileText, ShoppingCart, Truck, Building2, ClipboardList, Scale,
   PackageCheck, PackageOpen, Factory, Boxes, Warehouse, ArrowLeftRight, ListChecks, BookOpen, TriangleAlert, ScanBarcode, Settings2, Receipt,
   FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History, ListTree, NotebookPen, BookOpenText, Sigma, TrendingUp, Landmark, CalendarRange,
-  type LucideIcon,
+  Undo2, HandCoins, ReceiptText, Banknote, FileMinus, Network, Percent, type LucideIcon,
 } from "lucide-react";
 import { Logo } from "./logo";
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard, BadgeCheck, FileText, ShoppingCart, Truck, Building2, ClipboardList, Scale, PackageCheck, PackageOpen, Factory, Boxes, Warehouse,
   ArrowLeftRight, ListChecks, BookOpen, TriangleAlert, ScanBarcode, Settings2, Receipt, FileSpreadsheet, BarChart3, Users, ShieldCheck, Building, History,
-  ListTree, NotebookPen, BookOpenText, Sigma, TrendingUp, Landmark, CalendarRange,
+  ListTree, NotebookPen, BookOpenText, Sigma, TrendingUp, Landmark, CalendarRange, Undo2, HandCoins, ReceiptText, Banknote, FileMinus, Network, Percent,
 };
 import { cn } from "@/lib/cn";
 import type { NavGroup } from "./nav";

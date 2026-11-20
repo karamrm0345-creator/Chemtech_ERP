@@ -23,6 +23,8 @@
 - Sales orders with approval, per-line availability (on hand / reserved / available / shortage), reservation and release, short-close, cancellation rules, shortage → purchase request.
 - Delivery orders: partial deliveries, FEFO batch allocation or explicit batch, serial capture, rental items marked *rented out*; posting issues stock exactly once and updates fulfilment.
 - Service items are delivered and invoiced without stock movements.
+- Customer returns against posted deliveries: goods go back into stock (same batch / serials) at the cost they were delivered at; returned quantities are no longer invoiceable.
+- Credit notes against posted sales invoices for returned goods or price allowances (never above the invoiced price or quantity); applied to the invoice, any excess kept as customer credit.
 
 ### Procurement
 - Purchase requests (manual, from low stock, from sales shortage) with approval (optional by setting).
@@ -30,6 +32,7 @@
 - Purchase orders from PR / selected offer / scratch, freight and other charges, partial-delivery policy, approval limits, short-close, PR ordered-quantity tracking.
 - Goods receipts: tolerance check, rejected quantities with reasons (auto-logged as supplier nonconformity), batch / expiry / certificate / serial / bin capture, landed cost (freight allocated by value, converted to QAR), outstanding quantities.
 - Returns to supplier; supplier invoices with 3-way match (variance must be justified to post), freight / other charges billed against the PO, and payments through a chosen bank or cash account.
+- Debit notes against posted supplier invoices, optionally linked to a purchase return so the returned stock value is cleared exactly (difference to price variance); price allowances without a return.
 
 ### Store & inventory
 - Item master with types, control classes, manufacturer / part numbers, preferred supplier, min / reorder levels, prices, default warehouse / bin, batch / expiry / serial / hazardous flags; tracking fields locked once stock history exists.
@@ -48,6 +51,11 @@
 - Manual journal entries (including opening balances) with draft → post; the preparer cannot post their own journal (separation of duties).
 - Fiscal years (calendar year created automatically on first posting, or custom years), books lock date for month-end close, year-end close that moves income and expense to retained earnings, and audited reopen.
 - Trial balance, profit & loss, balance sheet (with profit not yet closed), general ledger / account statement with running balance and customer or supplier filter, journal register; every figure drills down to the journal and source document. Accounting-entry panel on invoices, receipts, deliveries and stock documents.
+- Receipts and payments per customer / supplier: one payment can settle several invoices (with *allocate oldest first*), any surplus is held on account as an advance and allocated later; credit and debit notes are allocated the same way.
+- Foreign-currency settlement: invoices are cleared at their own rate and the difference to the payment rate is posted as a realised exchange difference.
+- Withholding tax on supplier payments (rate per supplier, editable per payment): the bank pays the net, the withheld amount goes to *Withholding tax payable*.
+- Tax codes map each rate to its output and input tax accounts; cost centres on sales and supplier invoices and journal lines, with profit & loss and ledger filtered by cost centre.
+- Reports: customer aging and supplier aging (by days past due, with unallocated credits) and tax summary (output and input tax by rate, net of notes). Revenue figures on the dashboard and sales reports are net of credit notes.
 - Backfill (`npm run ledger:backfill`, run automatically by Docker start-up) posts journals for documents created before accounting was enabled. Integration tests reconcile the ledger to the stock ledger and to open receivables / payables.
 
 ### Customers / suppliers
@@ -59,10 +67,10 @@ Sales by period, sales by customer, sales order status, quotation conversion, pu
 
 ## Known limitations
 
-- **Accounting Phase 2 / 3 not yet built**: credit notes and sales returns, supplier debit notes, multi-invoice payment allocation and advances, tax templates and withholding tax, cost centres, bank reconciliation, budgets, fixed assets and depreciation, and foreign-exchange revaluation. Payments post at the invoice's exchange rate, so realised exchange differences are not yet calculated.
-- Returns to supplier post at average cost against GRNI; until debit notes exist, any difference stays in GRNI and is cleared with a manual journal.
+- **Accounting Phase 3 not yet built**: bank reconciliation, budgets, fixed assets and depreciation, unrealised foreign-exchange revaluation of open balances at period end, and a cash flow statement.
+- Refunds of customer credit (paying money back) and supplier refunds are not documents yet; record them with a manual journal on the party's receivable / payable.
+- Goods returned to a supplier *before* they are invoiced post at average cost against GRNI; a small difference to the receipt cost can remain in GRNI and is cleared with a manual journal. Returns linked to a debit note clear exactly.
 - **ERPNext history import** (10 years of journals) is planned as a separate step and needs an export from the ERPNext system to build and test against.
-- One payment applies to one invoice (no multi-invoice allocation or advance payments).
 - Stock balances are kept per warehouse and lot; bin location is recorded on movements and items but there is no per-bin balance.
 - Weighted-average cost is company-wide (not per warehouse); reversals restore quantities at the original cost but do not recompute historical averages.
 - Credit limit is displayed and warned about, not enforced as a hard block.
@@ -74,8 +82,8 @@ Sales by period, sales by customer, sales order status, quotation conversion, pu
 
 ## Suggested next steps
 
-1. Accounting Phase 2: credit notes and sales returns, supplier debit notes, payment allocation across invoices and advances, tax templates, cost centres.
-2. Accounting Phase 3: bank reconciliation, budgets, fixed assets and depreciation, foreign-exchange revaluation and realised exchange differences.
+1. Accounting Phase 3: bank reconciliation, budgets, fixed assets and depreciation, period-end foreign-exchange revaluation, cash flow statement, customer / supplier refunds.
+2. Customer and supplier statements as printable documents and email.
 3. ERPNext migration: import the chart of accounts, opening balances and historical journals from an ERPNext export, with reconciliation reports.
 4. Equipment rental module (rental orders, on-hire / off-hire, inspection and certification schedules, rental invoicing).
 5. Email notifications for approvals and alerts; PDF generation server-side for emailing.

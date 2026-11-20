@@ -22,6 +22,7 @@ export interface PostingLine {
   partyType?: "CUSTOMER" | "SUPPLIER";
   partyId?: string;
   description?: string;
+  costCenterId?: string | null;
 }
 
 export interface JournalInput {
@@ -68,14 +69,14 @@ export async function assertOpenPeriod(tx: Tx, date: Date, { ignoreLock = false 
 }
 
 async function resolveLines(tx: Tx, lines: PostingLine[]) {
-  const out: { accountId: string; debit: Dec; credit: Dec; partyType?: string; partyId?: string; description?: string }[] = [];
+  const out: { accountId: string; debit: Dec; credit: Dec; partyType?: string; partyId?: string; description?: string; costCenterId?: string | null }[] = [];
   for (const l of lines) {
     let dr = round2(D(l.debit));
     let cr = round2(D(l.credit));
-    if (dr.isNeg()) [dr, cr] = [ZERO, cr.add(dr.neg())];
-    if (cr.isNeg()) [dr, cr] = [dr.add(cr.neg()), ZERO];
+    if (dr.lt(0)) [dr, cr] = [ZERO, cr.add(dr.neg())];
+    if (cr.lt(0)) [dr, cr] = [dr.add(cr.neg()), ZERO];
     if (dr.isZero() && cr.isZero()) continue;
-    out.push({ accountId: await accountId(tx, l.account), debit: dr, credit: cr, partyType: l.partyType, partyId: l.partyId, description: l.description });
+    out.push({ accountId: await accountId(tx, l.account), debit: dr, credit: cr, partyType: l.partyType, partyId: l.partyId, description: l.description, costCenterId: l.costCenterId ?? null });
   }
   const ids = [...new Set(out.map((l) => l.accountId))];
   const accounts = await tx.account.findMany({ where: { id: { in: ids } } });
@@ -99,7 +100,7 @@ export async function balancedLines(tx: Tx, lines: PostingLine[], { allowRoundin
       throw new AppError(`Journal does not balance: debits ${dr.toFixed(2)} vs credits ${cr.toFixed(2)}.`);
     }
     const acc = await accountId(tx, "ROUNDING");
-    out.push({ accountId: acc, debit: diff.isNeg() ? diff.neg() : ZERO, credit: diff.isPos() ? diff : ZERO, description: "Rounding" });
+    out.push({ accountId: acc, debit: diff.lt(0) ? diff.neg() : ZERO, credit: diff.gt(0) ? diff : ZERO, description: "Rounding" });
   }
   return { lines: out, total: dr.gt(cr) ? dr : cr };
 }
@@ -147,7 +148,7 @@ export async function reverseJournal(tx: Tx, ctx: Ctx, journalId: string, opts: 
       lines: {
         create: j.lines.map((l) => ({
           lineNo: l.lineNo, accountId: l.accountId, date, debit: l.credit, credit: l.debit, partyType: l.partyType, partyId: l.partyId,
-          description: l.description, posted: true,
+          description: l.description, costCenterId: l.costCenterId, posted: true,
         })),
       },
     },

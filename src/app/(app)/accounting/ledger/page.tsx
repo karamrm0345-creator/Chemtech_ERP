@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
-import { currentPeriod, generalLedger } from "@/server/services/accounting";
+import { currentPeriod, generalLedger, listCostCenters } from "@/server/services/accounting";
 import { PageHeader, Notice } from "@/components/ui/primitives";
 import { DataTable } from "@/components/ui/data-table";
 import { PeriodBar } from "@/components/ui/period-bar";
@@ -20,13 +20,15 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   const from = str(sp, "from") ?? def.from, to = str(sp, "to") ?? def.to;
   const accountId = str(sp, "account");
   const partyType = str(sp, "partyType"), partyId = str(sp, "party");
-  const accounts = await prisma.account.findMany({ where: { isGroup: false }, orderBy: { code: "asc" } });
-  const gl = accountId || partyId ? await generalLedger(user, { accountId, partyType, partyId, from: parseBusinessDate(from)!, to: parseBusinessDate(to)! }) : null;
+  const costCenterId = str(sp, "costCenter");
+  const [accounts, centres] = await Promise.all([prisma.account.findMany({ where: { isGroup: false }, orderBy: { code: "asc" } }), listCostCenters({ includeInactive: true })]);
+  const gl = accountId || partyId ? await generalLedger(user, { accountId, partyType, partyId, costCenterId, from: parseBusinessDate(from)!, to: parseBusinessDate(to)! }) : null;
   return (
     <>
       <PageHeader title={gl?.account ? `${gl.account.code} ${gl.account.name}` : "General ledger"} subtitle={`Posted entries ${fmtDate(parseBusinessDate(from))} – ${fmtDate(parseBusinessDate(to))}, base currency`}
         crumbs={[{ label: "Accounting" }, { label: "General ledger" }]} actions={<PrintButton />} />
-      <PeriodBar defaults={{ from, to }} selects={[{ name: "account", label: "Choose an account…", options: accounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` })) }]} />
+      <PeriodBar defaults={{ from, to }} selects={[{ name: "account", label: "Choose an account…", options: accounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` })) },
+        ...(centres.length ? [{ name: "costCenter", label: "All cost centres", options: centres.map((c) => ({ value: c.id, label: `${c.code} ${c.name}` })) }] : [])]} />
       {!gl ? <Notice>Choose an account to see its ledger.</Notice> : (
         <DataTable basePath="/accounting/ledger" empty="No entries in this period"
           columns={[{ label: "Date" }, { label: "Journal" }, { label: "Document" }, { label: "Party" }, { label: "Description" }, ...(accountId ? [] : [{ label: "Account" }]), { label: "Debit", align: "right" }, { label: "Credit", align: "right" }, { label: "Balance (Dr − Cr)", align: "right" }]}

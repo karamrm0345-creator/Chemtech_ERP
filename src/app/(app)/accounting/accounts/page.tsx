@@ -50,7 +50,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 </span>,
                 humanize(n.type),
                 <span key="b" className="flex gap-1">{n.isBank && <Badge tone="blue">Bank</Badge>}{!n.active && <Badge tone="amber">Inactive</Badge>}</span>,
-                <span key="v" className={cn(n.isGroup && "font-semibold", n.balance.isNeg() && "text-red-600")}>{fmtAmount(n.balance)}</span>,
+                <span key="v" className={cn(n.isGroup && "font-semibold", n.balance.lt(0) && "text-red-600")}>{fmtAmount(n.balance)}</span>,
                 ...(manage ? [<QuickFormButton key="e" icon="edit" label="Edit" title={`Edit ${n.code} ${n.name}`} action={updateAccountAction.bind(null, n.id)} fields={accountFields(true)}
                   initial={{ code: n.code, name: n.name, type: n.type, parentId: n.parentId ?? "", isGroup: n.isGroup ? "yes" : "no", isBank: n.isBank ? "yes" : "no", active: n.active ? "yes" : "no", description: n.description ?? "" }} />] : []),
               ],

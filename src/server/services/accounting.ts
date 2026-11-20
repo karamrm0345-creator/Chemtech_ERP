@@ -95,15 +95,18 @@ export async function postingAccounts(ctx: Ctx) {
   return (Object.keys(POSTING_KEYS) as PostingKey[]).map((key) => ({ key, label: POSTING_KEYS[key], account: rows.find((r) => r.key === key)?.account ?? null }));
 }
 
-/** Sum of posted debits and credits per account, optionally within dates and excluding journal types. */
-async function sums(where: { from?: Date; to?: Date; before?: Date; excludeTypes?: string[] }) {
+/** Sum of posted debits and credits per account, optionally within dates, for a cost centre, excluding journal types. */
+async function sums(where: { from?: Date; to?: Date; before?: Date; excludeTypes?: string[]; costCenterId?: string }) {
   const date: Prisma.DateTimeFilter = {};
   if (where.from) date.gte = where.from;
   if (where.to) date.lte = where.to;
   if (where.before) date.lt = where.before;
   const g = await prisma.journalLine.groupBy({
     by: ["accountId"], _sum: { debit: true, credit: true },
-    where: { posted: true, ...(Object.keys(date).length ? { date } : {}), ...(where.excludeTypes ? { journal: { type: { notIn: where.excludeTypes } } } : {}) },
+    where: {
+      posted: true, ...(Object.keys(date).length ? { date } : {}), ...(where.excludeTypes ? { journal: { type: { notIn: where.excludeTypes } } } : {}),
+      ...(where.costCenterId ? { costCenterId: where.costCenterId } : {}),
+    },
   });
   return new Map(g.map((r) => [r.accountId, { dr: D(r._sum.debit), cr: D(r._sum.credit) }]));
 }
@@ -149,6 +152,7 @@ const journalLineSchema = z.object({
   partyType: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["CUSTOMER", "SUPPLIER"]).optional()),
   partyId: optId,
   description: optStr(300),
+  costCenterId: optId,
 });
 
 export const journalSchema = z.object({
@@ -162,7 +166,7 @@ export const journalSchema = z.object({
 function checkLines(lines: z.infer<typeof journalLineSchema>[]) {
   lines.forEach((l, i) => {
     const dr = D(l.debit), cr = D(l.credit);
-    if (dr.isNeg() || cr.isNeg()) throw new AppError(`Line ${i + 1}: amounts cannot be negative.`);
+    if (dr.lt(0) || cr.lt(0)) throw new AppError(`Line ${i + 1}: amounts cannot be negative.`);
     if (dr.isZero() === cr.isZero()) throw new AppError(`Line ${i + 1}: enter either a debit or a credit.`);
     if (!!l.partyType !== !!l.partyId) throw new AppError(`Line ${i + 1}: choose both the party type and the party.`);
   });
@@ -175,7 +179,7 @@ export async function saveJournal(ctx: Ctx, id: string | null, raw: unknown) {
   const date = ledgerDate(d.date ?? new Date());
   const lines = d.lines.map((l, i) => ({
     lineNo: i + 1, accountId: l.accountId, date, debit: round2(D(l.debit)), credit: round2(D(l.credit)),
-    partyType: l.partyType ?? null, partyId: l.partyId ?? null, description: l.description ?? null, posted: false,
+    partyType: l.partyType ?? null, partyId: l.partyId ?? null, description: l.description ?? null, costCenterId: l.costCenterId ?? null, posted: false,
   }));
   const totalDebit = lines.reduce((s, l) => s.add(l.debit), ZERO);
   return withTx(async (tx) => {
@@ -185,6 +189,7 @@ export async function saveJournal(ctx: Ctx, id: string | null, raw: unknown) {
       if (!a) throw new AppError(`Line ${l.lineNo}: unknown account.`);
       if (a.isGroup || !a.active) throw new AppError(`Line ${l.lineNo}: ${a.code} ${a.name} cannot take postings.`);
     }
+    await assertCostCenters(tx, lines.map((l) => l.costCenterId));
     if (id) {
       await lockRow(tx, "JournalEntry", id);
       const j = await tx.journalEntry.findUniqueOrThrow({ where: { id } });
@@ -209,7 +214,7 @@ export async function postManualJournal(ctx: Ctx, id: string) {
     const j = await tx.journalEntry.findUniqueOrThrow({ where: { id }, include: { lines: true } });
     if (j.status !== "DRAFT" || j.sourceType) throw new AppError(`Cannot post: ${j.number} is ${j.status.toLowerCase()}.`);
     if (j.createdById === ctx.userId) throw new AppError("Separation of duties: you cannot post a journal you prepared.");
-    await balancedLines(tx, j.lines.map((l) => ({ account: { id: l.accountId }, debit: D(l.debit), credit: D(l.credit) })), { allowRounding: false });
+    await balancedLines(tx, j.lines.map((l) => ({ account: { id: l.accountId }, debit: D(l.debit), credit: D(l.credit), costCenterId: l.costCenterId })), { allowRounding: false });
     await assertOpenPeriod(tx, j.date);
     await tx.journalLine.updateMany({ where: { journalId: id }, data: { posted: true } });
     await tx.journalEntry.update({ where: { id }, data: { status: "POSTED", postedById: ctx.userId, postedAt: new Date() } });
@@ -261,7 +266,7 @@ export async function getJournal(ctx: Ctx, id: string) {
   requirePerm(ctx, "accounting.view");
   const j = await prisma.journalEntry.findUnique({
     where: { id },
-    include: { lines: { orderBy: { lineNo: "asc" }, include: { account: true } }, reversedBy: true, reversalOf: true },
+    include: { lines: { orderBy: { lineNo: "asc" }, include: { account: true, costCenter: true } }, reversedBy: true, reversalOf: true },
   });
   if (!j) return null;
   const users = await prisma.user.findMany({ where: { id: { in: [j.createdById, j.postedById].filter(Boolean) as string[] } }, select: { id: true, name: true } });
@@ -336,21 +341,21 @@ export async function closeFiscalYear(ctx: Ctx, id: string) {
     const lines = g
       .map((r) => ({ id: r.accountId, net: D(r._sum.debit).sub(D(r._sum.credit)) }))
       .filter((r) => !r.net.isZero())
-      .map((r) => (r.net.isPos() ? { account: { id: r.id }, credit: r.net } : { account: { id: r.id }, debit: r.net.neg() }));
+      .map((r) => (r.net.gt(0) ? { account: { id: r.id }, credit: r.net } : { account: { id: r.id }, debit: r.net.neg() }));
     const profit = lines.reduce((s, l) => s.add(D(l.credit)).sub(D(l.debit)), ZERO).neg(); // income − expense
     let journalId: string | null = null;
     if (lines.length) {
       const j = await postJournal(tx, ctx, {
         date: fy.endDate, type: "CLOSING", memo: `Closing entry for fiscal year ${fy.name}`,
         source: { type: "FiscalYear", id: fy.id, no: fy.name, kind: `CLOSE-${Date.now()}` },
-        lines: [...lines, profit.isNeg() ? { account: "RETAINED_EARNINGS" as const, debit: profit.neg() } : { account: "RETAINED_EARNINGS" as const, credit: profit }],
+        lines: [...lines, profit.lt(0) ? { account: "RETAINED_EARNINGS" as const, debit: profit.neg() } : { account: "RETAINED_EARNINGS" as const, credit: profit }],
       }, { ignoreLock: true });
       journalId = j?.id ?? null;
     }
     await tx.fiscalYear.update({ where: { id }, data: { status: "CLOSED", closedAt: new Date(), closedById: ctx.userId, closingJournalId: journalId } });
     const s = await getSettings(tx);
     if (!s.booksLockedUntil || s.booksLockedUntil < fy.endDate) await tx.companySettings.update({ where: { id: 1 }, data: { booksLockedUntil: fy.endDate } });
-    await audit(tx, ctx, { action: "CLOSE", entity: "FiscalYear", entityId: id, summary: `Closed fiscal year ${fy.name}; net ${profit.isNeg() ? "loss" : "profit"} ${profit.abs().toFixed(2)} to retained earnings` });
+    await audit(tx, ctx, { action: "CLOSE", entity: "FiscalYear", entityId: id, summary: `Closed fiscal year ${fy.name}; net ${profit.lt(0) ? "loss" : "profit"} ${profit.abs().toFixed(2)} to retained earnings` });
     return { profit };
   });
 }
@@ -405,9 +410,9 @@ export async function trialBalance(ctx: Ctx, opts: { from: Date; to: Date }) {
     const closing = opening.add(mv.dr).sub(mv.cr);
     return {
       id: a.id, code: a.code, name: a.name, type: a.type,
-      openingDr: opening.isPos() ? opening : ZERO, openingCr: opening.isNeg() ? opening.neg() : ZERO,
+      openingDr: opening.gt(0) ? opening : ZERO, openingCr: opening.lt(0) ? opening.neg() : ZERO,
       debit: mv.dr, credit: mv.cr,
-      closingDr: closing.isPos() ? closing : ZERO, closingCr: closing.isNeg() ? closing.neg() : ZERO,
+      closingDr: closing.gt(0) ? closing : ZERO, closingCr: closing.lt(0) ? closing.neg() : ZERO,
     };
   }).filter((r) => !(r.openingDr.isZero() && r.openingCr.isZero() && r.debit.isZero() && r.credit.isZero())).sort((a, b) => a.code.localeCompare(b.code));
   const total = (k: keyof (typeof rows)[number]) => rows.reduce((s, r) => s.add(r[k] as Dec), ZERO);
@@ -418,9 +423,9 @@ export async function trialBalance(ctx: Ctx, opts: { from: Date; to: Date }) {
 }
 
 /** Income and expense for a period. Year-closing entries are excluded so closed years still report. */
-export async function profitAndLoss(ctx: Ctx, opts: { from: Date; to: Date }) {
+export async function profitAndLoss(ctx: Ctx, opts: { from: Date; to: Date; costCenterId?: string }) {
   requirePerm(ctx, "accounting.view");
-  const s = await sums({ from: ledgerDate(opts.from), to: ledgerDate(opts.to), excludeTypes: ["CLOSING"] });
+  const s = await sums({ from: ledgerDate(opts.from), to: ledgerDate(opts.to), excludeTypes: ["CLOSING"], costCenterId: opts.costCenterId });
   const accounts = await prisma.account.findMany({ where: { type: { in: ["INCOME", "EXPENSE"] } } });
   const nodes = tree(accounts, s);
   const income = nodes.filter((n) => n.type === "INCOME" && n.depth === 0).reduce((t, n) => t.add(n.balance), ZERO);
@@ -442,13 +447,14 @@ export async function balanceSheet(ctx: Ctx, opts: { asOf: Date }) {
 }
 
 /** Account statement with opening balance and running balance. */
-export async function generalLedger(ctx: Ctx, opts: { accountId?: string; partyType?: string; partyId?: string; from: Date; to: Date; limit?: number }) {
+export async function generalLedger(ctx: Ctx, opts: { accountId?: string; partyType?: string; partyId?: string; costCenterId?: string; from: Date; to: Date; limit?: number }) {
   requirePerm(ctx, "accounting.view");
   const from = ledgerDate(opts.from), to = ledgerDate(opts.to);
   const base: Prisma.JournalLineWhereInput = {
     posted: true,
     ...(opts.accountId ? { accountId: opts.accountId } : {}),
     ...(opts.partyType && opts.partyId ? { partyType: opts.partyType, partyId: opts.partyId } : {}),
+    ...(opts.costCenterId ? { costCenterId: opts.costCenterId } : {}),
   };
   const account = opts.accountId ? await prisma.account.findUnique({ where: { id: opts.accountId } }) : null;
   const ob = await prisma.journalLine.aggregate({ where: { ...base, date: { lt: from } }, _sum: { debit: true, credit: true } });
@@ -484,4 +490,74 @@ export async function currentPeriod() {
   const fy = await prisma.fiscalYear.findFirst({ where: { startDate: { lte: today }, endDate: { gte: today } } });
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   return { from: fy ? iso(fy.startDate) : `${today.getUTCFullYear()}-01-01`, to: iso(today) };
+}
+
+// ───────── Cost centres ─────────
+
+export const costCenterSchema = z.object({
+  code: z.string().trim().min(1, "Required").max(20).regex(/^[A-Za-z0-9.-]+$/, "Letters, digits, dot and dash only"),
+  name: reqStr(120),
+  active: z.coerce.boolean().default(true),
+});
+
+/** Throws unless every given cost centre exists and is active. */
+export async function assertCostCenters(tx: Tx, ids: (string | null | undefined)[]) {
+  const want = [...new Set(ids.filter(Boolean) as string[])];
+  if (!want.length) return;
+  const found = await tx.costCenter.findMany({ where: { id: { in: want }, active: true } });
+  if (found.length !== want.length) throw new AppError("Choose an active cost centre.");
+}
+
+export async function listCostCenters(opts: { includeInactive?: boolean } = {}) {
+  return prisma.costCenter.findMany({ where: opts.includeInactive ? {} : { active: true }, orderBy: { code: "asc" } });
+}
+
+export async function saveCostCenter(ctx: Ctx, id: string | null, raw: unknown) {
+  requirePerm(ctx, "accounting.coa.manage");
+  const d = costCenterSchema.parse(raw);
+  return withTx(async (tx) => {
+    const dup = await tx.costCenter.findUnique({ where: { code: d.code } });
+    if (dup && dup.id !== id) throw new AppError(`Cost centre ${d.code} already exists.`);
+    const before = id ? await tx.costCenter.findUniqueOrThrow({ where: { id } }) : null;
+    const cc = id ? await tx.costCenter.update({ where: { id }, data: d }) : await tx.costCenter.create({ data: d });
+    await audit(tx, ctx, { action: id ? "UPDATE" : "CREATE", entity: "CostCenter", entityId: cc.id, summary: `${id ? "Updated" : "Created"} cost centre ${cc.code} ${cc.name}`, before, after: cc });
+    return cc;
+  });
+}
+
+// ───────── Tax codes ─────────
+
+export const taxCodeSchema = z.object({
+  code: z.string().trim().min(1, "Required").max(20),
+  name: reqStr(120),
+  rate: decimalStr.refine((v) => Number(v) >= 0 && Number(v) <= 100, "Must be between 0 and 100"),
+  outputAccountId: optId,
+  inputAccountId: optId,
+  active: z.coerce.boolean().default(true),
+});
+
+export async function listTaxCodes() {
+  return prisma.taxCode.findMany({ orderBy: [{ active: "desc" }, { rate: "asc" }], include: { outputAccount: true, inputAccount: true } });
+}
+
+export async function saveTaxCode(ctx: Ctx, id: string | null, raw: unknown) {
+  requirePerm(ctx, "accounting.coa.manage");
+  const d = taxCodeSchema.parse(raw);
+  return withTx(async (tx) => {
+    const dup = await tx.taxCode.findUnique({ where: { code: d.code } });
+    if (dup && dup.id !== id) throw new AppError(`Tax code ${d.code} already exists.`);
+    if (d.active) {
+      const same = await tx.taxCode.findFirst({ where: { active: true, rate: D(d.rate), ...(id ? { id: { not: id } } : {}) } });
+      if (same) throw new AppError(`Tax code ${same.code} already uses ${D(d.rate).toFixed(2)}%. Each active rate maps to one code.`);
+    }
+    for (const accId of [d.outputAccountId, d.inputAccountId].filter(Boolean) as string[]) {
+      const a = await tx.account.findUnique({ where: { id: accId } });
+      if (!a || a.isGroup || !a.active) throw new AppError("Tax accounts must be active, non-group accounts.");
+    }
+    const data = { code: d.code, name: d.name, rate: D(d.rate), outputAccountId: d.outputAccountId ?? null, inputAccountId: d.inputAccountId ?? null, active: d.active };
+    const before = id ? await tx.taxCode.findUniqueOrThrow({ where: { id } }) : null;
+    const t = id ? await tx.taxCode.update({ where: { id }, data }) : await tx.taxCode.create({ data });
+    await audit(tx, ctx, { action: id ? "UPDATE" : "CREATE", entity: "TaxCode", entityId: t.id, summary: `${id ? "Updated" : "Created"} tax code ${t.code} (${D(t.rate).toFixed(2)}%)`, before, after: t });
+    return t;
+  });
 }

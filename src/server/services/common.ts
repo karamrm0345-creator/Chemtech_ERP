@@ -23,7 +23,7 @@ export async function lockRow(tx: Tx, table: string, id: string) {
   const allowed = new Set([
     "SalesQuotation", "SalesOrder", "DeliveryOrder", "SalesInvoice", "PurchaseRequest", "Rfq",
     "SupplierQuotation", "PurchaseOrder", "GoodsReceipt", "PurchaseReturn", "PurchaseInvoice",
-    "StockDocument", "StockCount", "JournalEntry", "FiscalYear",
+    "StockDocument", "StockCount", "JournalEntry", "FiscalYear", "CreditNote", "DebitNote", "CustomerReturn",
   ]);
   if (!allowed.has(table)) throw new Error("lockRow: table not allowed");
   const rows = await tx.$queryRawUnsafe<{ id: string }[]>(`SELECT id FROM "${table}" WHERE id = $1 FOR UPDATE`, id);

@@ -29,6 +29,25 @@ const STOCK_COUNTER: Record<Exclude<InvTxnType, "REVERSAL">, PostingKey> = {
 };
 
 const toBase = (amount: Dec, rate: Dec) => D(amount).mul(D(rate));
+
+/** Tax account for a rate: the active tax code with that rate, else the default posting account. */
+async function taxAccount(tx: Tx, side: "OUTPUT" | "INPUT", rate: Dec): Promise<AccountRef> {
+  const code = await tx.taxCode.findFirst({ where: { active: true, rate: D(rate) }, orderBy: { createdAt: "asc" } });
+  const id = side === "OUTPUT" ? code?.outputAccountId : code?.inputAccountId;
+  return id ? { id } : side === "OUTPUT" ? "TAX_OUTPUT" : "TAX_INPUT";
+}
+
+/** Tax lines grouped by rate, in base currency, on the credit or debit side. */
+async function taxLines(tx: Tx, side: "OUTPUT" | "INPUT", lines: { taxRate: Dec; taxAmount: Dec }[], rate: Dec, credit: boolean) {
+  const byRate = new Map<string, Dec>();
+  for (const l of lines) if (!D(l.taxAmount).isZero()) byRate.set(D(l.taxRate).toString(), (byRate.get(D(l.taxRate).toString()) ?? ZERO).add(D(l.taxAmount)));
+  const out: PostingLine[] = [];
+  for (const [r, amt] of byRate) {
+    const acc = await taxAccount(tx, side, D(r));
+    out.push(credit ? cr(acc, toBase(amt, rate), { description: `Tax ${D(r).toFixed(2)}%` }) : dr(acc, toBase(amt, rate), { description: `Tax ${D(r).toFixed(2)}%` }));
+  }
+  return out;
+}
 const dr = (account: AccountRef, amount: Dec, extra: Partial<PostingLine> = {}): PostingLine => ({ account, debit: amount, ...extra });
 const cr = (account: AccountRef, amount: Dec, extra: Partial<PostingLine> = {}): PostingLine => ({ account, credit: amount, ...extra });
 
@@ -51,7 +70,7 @@ export async function postStockJournal(tx: Tx, ctx: Ctx, doc: { type: string; id
   // Transfers move value between warehouses inside the same inventory account.
   const net = new Map<PostingKey, Dec>([["INVENTORY", inventory.add(byCounter.get("INVENTORY") ?? ZERO)]]);
   for (const [k, v] of byCounter) if (k !== "INVENTORY") net.set(k, v);
-  const lines: PostingLine[] = [...net].map(([k, v]) => (v.isNeg() ? cr(k, v.neg()) : dr(k, v)));
+  const lines: PostingLine[] = [...net].map(([k, v]) => (v.lt(0) ? cr(k, v.neg()) : dr(k, v)));
   return postJournal(tx, ctx, {
     date: rows[0].txnDate, type: "STOCK", memo: doc.memo ?? `Stock movement ${doc.no}`,
     source: { type: doc.type, id: doc.id, no: doc.no }, lines,
@@ -66,18 +85,19 @@ export async function postSalesInvoiceJournal(tx: Tx, ctx: Ctx, invoiceId: strin
   const lines: PostingLine[] = [dr("AR", toBase(inv.total, rate), { ...party, description: inv.customer.legalName })];
   for (const l of inv.lines) {
     const it = l.itemId ? items.get(l.itemId) : undefined;
-    lines.push(cr(it && isStockItem(it) ? "SALES" : "SALES_SERVICE", toBase(l.lineTotal, rate), { description: l.description }));
+    lines.push(cr(it && isStockItem(it) ? "SALES" : "SALES_SERVICE", toBase(l.lineTotal, rate), { description: l.description, costCenterId: inv.costCenterId }));
   }
-  lines.push(cr("TAX_OUTPUT", toBase(inv.taxTotal, rate)));
+  lines.push(...(await taxLines(tx, "OUTPUT", inv.lines, rate, true)));
   return postJournal(tx, ctx, { date: inv.date, type: "SALES_INVOICE", memo: `Sales invoice ${inv.number}`, source: { type: "SalesInvoice", id: inv.id, no: inv.number }, lines });
 }
 
+/** Receipt: bank or cash against the customer's receivable, at the receipt's exchange rate. */
 export async function postCustomerPaymentJournal(tx: Tx, ctx: Ctx, paymentId: string) {
-  const p = await tx.customerPayment.findUniqueOrThrow({ where: { id: paymentId }, include: { invoice: true } });
+  const p = await tx.customerPayment.findUniqueOrThrow({ where: { id: paymentId } });
   if (!p.accountId) throw new AppError("Select the bank or cash account for this receipt.");
-  const amount = toBase(p.amount, p.invoice.exchangeRate);
+  const amount = toBase(p.amount, p.exchangeRate);
   return postJournal(tx, ctx, {
-    date: p.date, type: "CUSTOMER_PAYMENT", memo: `Receipt ${p.number} for ${p.invoice.number}`, reference: p.reference,
+    date: p.date, type: "CUSTOMER_PAYMENT", memo: `Receipt ${p.number}`, reference: p.reference,
     source: { type: "CustomerPayment", id: p.id, no: p.number },
     lines: [dr({ id: p.accountId }, amount), cr("AR", amount, { partyType: "CUSTOMER", partyId: p.customerId })],
   });
@@ -106,13 +126,13 @@ export async function postPurchaseInvoiceJournal(tx: Tx, ctx: Ctx, invoiceId: st
       const atPo = toBase(D(l.quantity).mul(poUnit), rate);
       lines.push(dr("GRNI", atPo, { description: l.description }));
       const variance = invoiced.sub(atPo);
-      if (!variance.isZero()) lines.push(dr("PRICE_VARIANCE", variance, { description: `Price variance ${l.description}` }));
+      if (!variance.isZero()) lines.push(dr("PRICE_VARIANCE", variance, { description: `Price variance ${l.description}`, costCenterId: inv.costCenterId }));
     } else {
-      lines.push(dr("PURCHASE_EXPENSE", invoiced, { description: l.description }));
+      lines.push(dr("PURCHASE_EXPENSE", invoiced, { description: l.description, costCenterId: inv.costCenterId }));
     }
   }
-  if (D(inv.charges).gt(0)) lines.push(dr(anyStock ? "GRNI" : "PURCHASE_EXPENSE", toBase(inv.charges, rate), { description: "Freight and other charges" }));
-  lines.push(dr("TAX_INPUT", toBase(inv.taxTotal, rate)));
+  if (D(inv.charges).gt(0)) lines.push(dr(anyStock ? "GRNI" : "PURCHASE_EXPENSE", toBase(inv.charges, rate), { description: "Freight and other charges", costCenterId: anyStock ? null : inv.costCenterId }));
+  lines.push(...(await taxLines(tx, "INPUT", inv.lines, rate, false)));
   lines.push(cr("AP", toBase(inv.total, rate), { partyType: "SUPPLIER", partyId: inv.supplierId, description: inv.supplier.legalName }));
   return postJournal(tx, ctx, {
     date: inv.date, type: "PURCHASE_INVOICE", memo: `Supplier invoice ${inv.supplierInvoiceNo} (${inv.number})`, reference: inv.supplierInvoiceNo,
@@ -120,13 +140,66 @@ export async function postPurchaseInvoiceJournal(tx: Tx, ctx: Ctx, invoiceId: st
   });
 }
 
+/** Supplier payment: payable cleared in full; the bank pays the net and any withholding tax becomes a liability. */
 export async function postSupplierPaymentJournal(tx: Tx, ctx: Ctx, paymentId: string) {
-  const p = await tx.supplierPayment.findUniqueOrThrow({ where: { id: paymentId }, include: { invoice: true } });
+  const p = await tx.supplierPayment.findUniqueOrThrow({ where: { id: paymentId } });
   if (!p.accountId) throw new AppError("Select the bank or cash account for this payment.");
-  const amount = toBase(p.amount, p.invoice.exchangeRate);
+  const gross = toBase(p.amount, p.exchangeRate);
+  const wht = toBase(p.whtAmount, p.exchangeRate);
   return postJournal(tx, ctx, {
-    date: p.date, type: "SUPPLIER_PAYMENT", memo: `Payment ${p.number} for ${p.invoice.number}`, reference: p.reference,
+    date: p.date, type: "SUPPLIER_PAYMENT", memo: `Payment ${p.number}`, reference: p.reference,
     source: { type: "SupplierPayment", id: p.id, no: p.number },
-    lines: [dr("AP", amount, { partyType: "SUPPLIER", partyId: p.supplierId }), cr({ id: p.accountId }, amount)],
+    lines: [
+      dr("AP", gross, { partyType: "SUPPLIER", partyId: p.supplierId }),
+      cr({ id: p.accountId }, D(gross).sub(wht)),
+      cr("WHT_PAYABLE", wht, { description: `Withholding tax ${D(p.whtRate).toFixed(2)}%` }),
+    ],
+  });
+}
+
+/** Credit note: reverses revenue and output tax for the credited lines against the customer's receivable. */
+export async function postCreditNoteJournal(tx: Tx, ctx: Ctx, creditNoteId: string) {
+  const n = await tx.creditNote.findUniqueOrThrow({ where: { id: creditNoteId }, include: { lines: true, invoice: true, customer: { select: { legalName: true } } } });
+  const rate = D(n.exchangeRate);
+  const items = new Map((await tx.item.findMany({ where: { id: { in: n.lines.map((l) => l.itemId!).filter(Boolean) } } })).map((i) => [i.id, i]));
+  const lines: PostingLine[] = [];
+  for (const l of n.lines) {
+    const it = l.itemId ? items.get(l.itemId) : undefined;
+    lines.push(dr(it && isStockItem(it) ? "SALES" : "SALES_SERVICE", toBase(l.lineTotal, rate), { description: l.description, costCenterId: n.invoice.costCenterId }));
+  }
+  lines.push(...(await taxLines(tx, "OUTPUT", n.lines, rate, false)));
+  lines.push(cr("AR", toBase(n.total, rate), { partyType: "CUSTOMER", partyId: n.customerId, description: n.customer.legalName }));
+  return postJournal(tx, ctx, { date: n.date, type: "CREDIT_NOTE", memo: `Credit note ${n.number} for ${n.invoice.number}`, source: { type: "CreditNote", id: n.id, no: n.number }, lines });
+}
+
+/**
+ * Debit note: reduces the payable. Returned goods clear the GRNI that the
+ * purchase return booked (at its stock value) with the price difference to
+ * variance; price allowances on stock go to variance; non-stock to expense.
+ */
+export async function postDebitNoteJournal(tx: Tx, ctx: Ctx, debitNoteId: string) {
+  const n = await tx.debitNote.findUniqueOrThrow({ where: { id: debitNoteId }, include: { lines: true, invoice: true, supplier: { select: { legalName: true } } } });
+  const rate = D(n.exchangeRate);
+  const items = new Map((await tx.item.findMany({ where: { id: { in: n.lines.map((l) => l.itemId!).filter(Boolean) } } })).map((i) => [i.id, i]));
+  const cc = n.invoice.costCenterId;
+  const lines: PostingLine[] = [dr("AP", toBase(n.total, rate), { partyType: "SUPPLIER", partyId: n.supplierId, description: n.supplier.legalName })];
+  for (const l of n.lines) {
+    const it = l.itemId ? items.get(l.itemId) : undefined;
+    const value = toBase(l.lineTotal, rate);
+    if (it && isStockItem(it) && l.returnLineId) {
+      const rl = await tx.purchaseReturnLine.findUniqueOrThrow({ where: { id: l.returnLineId } });
+      const moved = await tx.inventoryTransaction.aggregate({ where: { refDocType: "PurchaseReturn", refLineId: rl.id }, _sum: { totalValue: true } });
+      const grni = D(moved._sum.totalValue).abs().mul(D(l.quantity)).div(D(rl.quantity));
+      lines.push(cr("GRNI", grni, { description: `Returned: ${l.description}` }));
+      const diff = value.sub(grni);
+      if (!diff.isZero()) lines.push(cr("PRICE_VARIANCE", diff, { description: `Price difference on return ${l.description}`, costCenterId: cc }));
+    } else {
+      lines.push(cr(it && isStockItem(it) ? "PRICE_VARIANCE" : "PURCHASE_EXPENSE", value, { description: l.description, costCenterId: cc }));
+    }
+  }
+  lines.push(...(await taxLines(tx, "INPUT", n.lines, rate, true)));
+  return postJournal(tx, ctx, {
+    date: n.date, type: "DEBIT_NOTE", memo: `Debit note ${n.number} for ${n.invoice.number}`, reference: n.supplierRef,
+    source: { type: "DebitNote", id: n.id, no: n.number }, lines,
   });
 }

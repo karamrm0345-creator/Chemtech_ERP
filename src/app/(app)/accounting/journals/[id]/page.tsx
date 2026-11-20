@@ -45,18 +45,19 @@ export default async function JournalPage({ params }: { params: Promise<{ id: st
           ]} /></Card>
           <Card bodyClass="p-0">
             <table className="table-base">
-              <thead><tr><th>#</th><th>Account</th><th>Party</th><th>Description</th><th className="text-right">Debit</th><th className="text-right">Credit</th></tr></thead>
+              <thead><tr><th>#</th><th>Account</th><th>Party</th><th>Description</th><th>Cost centre</th><th className="text-right">Debit</th><th className="text-right">Credit</th></tr></thead>
               <tbody>{j.lines.map((l) => (
                 <tr key={l.id}>
                   <td>{l.lineNo}</td>
                   <td><Link className="link" href={`/accounting/ledger?account=${l.accountId}`}><span className="font-mono text-xs">{l.account.code}</span> {l.account.name}</Link></td>
                   <td>{l.partyId ? j.parties.get(l.partyId) ?? "—" : ""}</td>
                   <td>{l.description}</td>
+                  <td>{l.costCenter ? l.costCenter.code : ""}</td>
                   <td className="num">{D(l.debit).isZero() ? "" : fmtAmount(l.debit)}</td>
                   <td className="num">{D(l.credit).isZero() ? "" : fmtAmount(l.credit)}</td>
                 </tr>
               ))}</tbody>
-              <tfoot><tr className="font-semibold"><td colSpan={4} className="text-right">Total</td><td className="num">{fmtAmount(dr)}</td><td className="num">{fmtAmount(cr)}</td></tr></tfoot>
+              <tfoot><tr className="font-semibold"><td colSpan={5} className="text-right">Total</td><td className="num">{fmtAmount(dr)}</td><td className="num">{fmtAmount(cr)}</td></tr></tfoot>
             </table>
           </Card>
         </div>

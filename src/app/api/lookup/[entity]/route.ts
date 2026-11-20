@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ enti
   if (entity === "suppliers") {
     if (!user.permissions.has("supplier.view")) return deny();
     const rows = await prisma.supplier.findMany({ where: { active: true, prequalStatus: { not: "REJECTED" }, ...(q ? { OR: [{ code: contains }, { legalName: contains }, { productsServices: contains }] } : {}) }, take: 25, orderBy: { legalName: "asc" } });
-    return NextResponse.json(rows.map((s) => ({ id: s.id, label: s.legalName, sub: `${s.code} · ${s.prequalStatus.replace("_", " ").toLowerCase()}`, data: { currency: s.currency, paymentTerms: s.paymentTerms ?? "" } })));
+    return NextResponse.json(rows.map((s) => ({ id: s.id, label: s.legalName, sub: `${s.code} · ${s.prequalStatus.replace("_", " ").toLowerCase()}`, data: { currency: s.currency, paymentTerms: s.paymentTerms ?? "", withholdingRate: s.withholdingRate.toString() } })));
   }
   if (entity === "contacts") {
     if (!user.permissions.has("customer.view")) return deny();

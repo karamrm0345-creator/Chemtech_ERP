@@ -27,6 +27,7 @@ export const supplierSchema = z.object({
   paymentTermDays: z.coerce.number().int().min(0).max(365).default(30),
   currency: reqStr(3).default("QAR"),
   taxRegNo: optStr(50),
+  withholdingRate: z.preprocess((v) => (v === "" || v == null ? 0 : v), z.coerce.number().min(0).max(100)).default(0),
   crNumber: optStr(50),
   prequalStatus: z.enum(["NOT_STARTED", "PENDING", "APPROVED", "CONDITIONAL", "REJECTED", "EXPIRED"]).default("NOT_STARTED"),
   rating: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().min(0).max(5).optional()),

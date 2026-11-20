@@ -3,16 +3,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSalesInvoiceAction } from "@/app/actions/finance";
 import { useAction } from "@/components/forms/use-action";
-import { Field, FormActions } from "@/components/forms/fields";
+import { Field, FormActions, Select } from "@/components/forms/fields";
 import { btn, Card } from "@/components/ui/primitives";
 import { fmtAmount } from "@/lib/format";
 
 type L = { id: string; lineNo: number; description: string; invoiceable: number; unitPrice: string; discountPct: string; taxRate: string };
 
-export function InvoiceForm({ salesOrderId, currency, lines, date }: { salesOrderId: string; currency: string; lines: L[]; date: string }) {
+export function InvoiceForm({ salesOrderId, currency, lines, date, costCenters = [] }: { salesOrderId: string; currency: string; lines: L[]; date: string; costCenters?: { value: string; label: string }[] }) {
   const router = useRouter();
   const { run, pending } = useAction();
-  const [h, setH] = useState({ date, notes: "" });
+  const [h, setH] = useState({ date, notes: "", costCenterId: "" });
   const [q, setQ] = useState<Record<string, string>>(Object.fromEntries(lines.map((l) => [l.id, String(l.invoiceable)])));
   const net = (l: L) => Number(q[l.id] || 0) * Number(l.unitPrice) * (1 - Number(l.discountPct) / 100);
   const total = lines.reduce((s, l) => s + net(l) * (1 + Number(l.taxRate) / 100), 0);
@@ -21,7 +21,7 @@ export function InvoiceForm({ salesOrderId, currency, lines, date }: { salesOrde
       e.preventDefault();
       await run(() => createSalesInvoiceAction({ salesOrderId, ...h, lines: Object.entries(q).filter(([, v]) => Number(v) > 0).map(([salesOrderLineId, quantity]) => ({ salesOrderLineId, quantity })) }), { redirect: (d) => `/finance/sales-invoices/${(d as { id: string }).id}` });
     }}>
-      <Card><div className="grid gap-4 sm:grid-cols-3"><Field label="Invoice date"><input type="date" className="input" value={h.date} onChange={(e) => setH({ ...h, date: e.target.value })} /></Field><Field label="Notes" className="sm:col-span-2"><input className="input" value={h.notes} onChange={(e) => setH({ ...h, notes: e.target.value })} /></Field></div></Card>
+      <Card><div className="grid gap-4 sm:grid-cols-3"><Field label="Invoice date"><input type="date" className="input" value={h.date} onChange={(e) => setH({ ...h, date: e.target.value })} /></Field>{costCenters.length > 0 && <Field label="Cost centre"><Select value={h.costCenterId} onChange={(v) => setH({ ...h, costCenterId: v })} options={costCenters} placeholder="—" /></Field>}<Field label="Notes" className={costCenters.length ? "" : "sm:col-span-2"}><input className="input" value={h.notes} onChange={(e) => setH({ ...h, notes: e.target.value })} /></Field></div></Card>
       <Card bodyClass="p-0">
         <table className="table-base">
           <thead><tr><th>#</th><th>Description</th><th className="text-right">Invoiceable</th><th className="w-28 text-right">Invoice qty</th><th className="text-right">Unit price</th><th className="text-right">Net</th></tr></thead>

@@ -10,7 +10,7 @@ import type { Permission } from "../auth/permissions";
 import { D, round2 } from "@/lib/decimal";
 import { stockOnHandReport } from "./inventory";
 import { lowStockSuggestions } from "./purchasing";
-import { slowMovingItems } from "./dashboard";
+import { NET_SALES, slowMovingItems } from "./dashboard";
 
 export type ColType = "text" | "money" | "qty" | "date" | "datetime" | "pct" | "int";
 export interface Column { key: string; label: string; type?: ColType }
@@ -22,7 +22,7 @@ export interface ReportParams {
 }
 export interface ReportResult { columns: Column[]; rows: Record<string, unknown>[]; totals?: Record<string, number>; note?: string }
 export interface ReportDef {
-  key: string; title: string; group: "Sales" | "Procurement" | "Inventory" | "Control"; description: string;
+  key: string; title: string; group: "Sales" | "Procurement" | "Inventory" | "Accounting" | "Control"; description: string;
   permission: Permission; filters: ReportFilter[]; run: (p: ReportParams, ctx: Ctx) => Promise<ReportResult>;
 }
 
@@ -50,14 +50,14 @@ export const REPORTS: ReportDef[] = [
             SUM((subtotal - "discountTotal") * "exchangeRate") v, COUNT(*) c FROM "SalesOrder"
             WHERE status IN ${SO_CONFIRMED} ${range(p, "date")} ${cust} GROUP BY 1),
         inv AS (SELECT to_char(date_trunc('month', date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Qatar'), 'YYYY-MM') m,
-            SUM(subtotal * "exchangeRate") v FROM "SalesInvoice"
-            WHERE status IN ('POSTED','PARTIALLY_PAID','PAID') ${range(p, "date")} ${cust} GROUP BY 1)
+            SUM(base) v FROM ${NET_SALES} rev
+            WHERE true ${range(p, "date")} ${cust} GROUP BY 1)
         SELECT COALESCE(so.m, inv.m) AS month, COALESCE(so.c, 0)::int orders, COALESCE(so.v, 0)::float "orderIntake", COALESCE(inv.v, 0)::float revenue
         FROM so FULL OUTER JOIN inv ON so.m = inv.m ORDER BY 1`;
       return {
         columns: [{ key: "month", label: "Month" }, { key: "orders", label: "Orders", type: "int" }, { key: "orderIntake", label: "Order intake (QAR)", type: "money" }, { key: "revenue", label: "Invoiced revenue (QAR)", type: "money" }],
         rows, totals: sum(rows, "orders", "orderIntake", "revenue"),
-        note: "Order intake = approved sales orders (not revenue). Revenue = posted sales invoices, net of tax.",
+        note: "Order intake = approved sales orders (not revenue). Revenue = posted sales invoices less credit notes, net of tax.",
       };
     },
   },
@@ -70,7 +70,7 @@ export const REPORTS: ReportDef[] = [
         SELECT c.code, c."legalName" customer, c.category,
           COALESCE((SELECT COUNT(*) FROM "SalesOrder" so WHERE so."customerId" = c.id AND so.status IN ${SO_CONFIRMED} ${range(p, "so.date")}), 0)::int orders,
           COALESCE((SELECT SUM((so.subtotal - so."discountTotal") * so."exchangeRate") FROM "SalesOrder" so WHERE so."customerId" = c.id AND so.status IN ${SO_CONFIRMED} ${range(p, "so.date")}), 0)::float "orderIntake",
-          COALESCE((SELECT SUM(i.subtotal * i."exchangeRate") FROM "SalesInvoice" i WHERE i."customerId" = c.id AND i.status IN ('POSTED','PARTIALLY_PAID','PAID') ${range(p, "i.date")}), 0)::float revenue,
+          COALESCE((SELECT SUM(i.base) FROM ${NET_SALES} i WHERE i."customerId" = c.id ${range(p, "i.date")}), 0)::float revenue,
           COALESCE((SELECT SUM((i.total - i."paidAmount") * i."exchangeRate") FROM "SalesInvoice" i WHERE i."customerId" = c.id AND i.status IN ('POSTED','PARTIALLY_PAID')), 0)::float outstanding
         FROM "Customer" c ORDER BY "orderIntake" DESC`;
       const filtered = rows.filter((r) => n(r.orders) > 0 || n(r.revenue) > 0 || n(r.outstanding) > 0);
@@ -288,6 +288,103 @@ export const REPORTS: ReportDef[] = [
         ...docs.map((d) => ({ kind: "Supplier certificate", reference: `${d.docType}${d.docNumber ? ` ${d.docNumber}` : ""}`, owner: d.supplier.legalName, qty: null, expiry: d.expiryDate })),
       ].map((r) => ({ ...r, days: Math.floor((r.expiry!.getTime() - now) / 86_400_000) })).sort((a, b) => a.days - b.days);
       return { columns: [{ key: "kind", label: "Type" }, { key: "reference", label: "Reference" }, { key: "owner", label: "Item / supplier" }, { key: "qty", label: "Qty in stock", type: "qty" }, { key: "expiry", label: "Expiry", type: "date" }, { key: "days", label: "Days left", type: "int" }], rows };
+    },
+  },
+  {
+    key: "customer-aging", title: "Customer aging", group: "Accounting", permission: "finance.view",
+    description: "Open sales invoice balances by days past due (base currency), with unallocated receipts and credit notes.",
+    filters: [{ kind: "customer" }],
+    async run(p) {
+      const party = p.customerId ? Prisma.sql`AND i."customerId" = ${p.customerId}` : Prisma.empty;
+      const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+        WITH open AS (
+          SELECT i."customerId" pid, (i.total - i."paidAmount") * i."exchangeRate" bal,
+            GREATEST(0, (now()::date - (i."dueDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Qatar')::date)) days
+          FROM "SalesInvoice" i WHERE i.status IN ('POSTED','PARTIALLY_PAID') ${party}),
+        credits AS (
+          SELECT "customerId" pid, SUM((amount - "allocatedAmount") * "exchangeRate") v FROM "CustomerPayment" GROUP BY 1
+          UNION ALL
+          SELECT "customerId" pid, SUM((total - "allocatedAmount") * "exchangeRate") v FROM "CreditNote" WHERE status = 'POSTED' GROUP BY 1)
+        SELECT x.code, x."legalName" party,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days = 0), 0)::float "current",
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days BETWEEN 1 AND 30), 0)::float d30,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days BETWEEN 31 AND 60), 0)::float d60,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days BETWEEN 61 AND 90), 0)::float d90,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days > 90), 0)::float d90p,
+          COALESCE(SUM(o.bal), 0)::float total,
+          COALESCE((SELECT SUM(v) FROM credits c WHERE c.pid = x.id), 0)::float credits
+        FROM "Customer" x LEFT JOIN open o ON o.pid = x.id
+        GROUP BY x.id, x.code, x."legalName"
+        HAVING COALESCE(SUM(o.bal), 0) <> 0 OR COALESCE((SELECT SUM(v) FROM credits c WHERE c.pid = x.id), 0) <> 0
+        ORDER BY total DESC`;
+      return {
+        columns: [{ key: "code", label: "Code" }, { key: "party", label: "Customer" }, { key: "current", label: "Not due", type: "money" }, { key: "d30", label: "1–30 days", type: "money" },
+          { key: "d60", label: "31–60 days", type: "money" }, { key: "d90", label: "61–90 days", type: "money" }, { key: "d90p", label: "Over 90 days", type: "money" }, { key: "total", label: "Total open (QAR)", type: "money" },
+          { key: "credits", label: "Unallocated credits (QAR)", type: "money" }],
+        rows, totals: sum(rows, "current", "d30", "d60", "d90", "d90p", "total", "credits"),
+        note: "Days past due are counted from each invoice's due date to today. Unallocated credits can be applied to open invoices from the receipt or note.",
+      };
+    },
+  },
+  {
+    key: "supplier-aging", title: "Supplier aging", group: "Accounting", permission: "finance.view",
+    description: "Open supplier invoice balances by days past due (base currency), with unallocated payments and debit notes.",
+    filters: [{ kind: "supplier" }],
+    async run(p) {
+      const party = p.supplierId ? Prisma.sql`AND i."supplierId" = ${p.supplierId}` : Prisma.empty;
+      const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+        WITH open AS (
+          SELECT i."supplierId" pid, (i.total - i."paidAmount") * i."exchangeRate" bal,
+            GREATEST(0, (now()::date - (i."dueDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Qatar')::date)) days
+          FROM "PurchaseInvoice" i WHERE i.status IN ('POSTED','PARTIALLY_PAID') ${party}),
+        credits AS (
+          SELECT "supplierId" pid, SUM((amount - "allocatedAmount") * "exchangeRate") v FROM "SupplierPayment" GROUP BY 1
+          UNION ALL
+          SELECT "supplierId" pid, SUM((total - "allocatedAmount") * "exchangeRate") v FROM "DebitNote" WHERE status = 'POSTED' GROUP BY 1)
+        SELECT x.code, x."legalName" party,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days = 0), 0)::float "current",
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days BETWEEN 1 AND 30), 0)::float d30,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days BETWEEN 31 AND 60), 0)::float d60,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days BETWEEN 61 AND 90), 0)::float d90,
+          COALESCE(SUM(o.bal) FILTER (WHERE o.days > 90), 0)::float d90p,
+          COALESCE(SUM(o.bal), 0)::float total,
+          COALESCE((SELECT SUM(v) FROM credits c WHERE c.pid = x.id), 0)::float credits
+        FROM "Supplier" x LEFT JOIN open o ON o.pid = x.id
+        GROUP BY x.id, x.code, x."legalName"
+        HAVING COALESCE(SUM(o.bal), 0) <> 0 OR COALESCE((SELECT SUM(v) FROM credits c WHERE c.pid = x.id), 0) <> 0
+        ORDER BY total DESC`;
+      return {
+        columns: [{ key: "code", label: "Code" }, { key: "party", label: "Supplier" }, { key: "current", label: "Not due", type: "money" }, { key: "d30", label: "1–30 days", type: "money" },
+          { key: "d60", label: "31–60 days", type: "money" }, { key: "d90", label: "61–90 days", type: "money" }, { key: "d90p", label: "Over 90 days", type: "money" }, { key: "total", label: "Total open (QAR)", type: "money" },
+          { key: "credits", label: "Unallocated credits (QAR)", type: "money" }],
+        rows, totals: sum(rows, "current", "d30", "d60", "d90", "d90p", "total", "credits"),
+        note: "Days past due are counted from each invoice's due date to today. Unallocated credits can be applied to open invoices from the payment or note.",
+      };
+    },
+  },
+  {
+    key: "tax-summary", title: "Tax summary", group: "Accounting", permission: "accounting.view",
+    description: "Output tax on sales and input tax on purchases by rate for a period, net of credit and debit notes (base currency).",
+    filters: [{ kind: "dateRange" }],
+    async run(p) {
+      const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+        WITH t AS (
+          SELECT 'Output (sales)' dir, l."taxRate" rate, l."lineTotal" * i."exchangeRate" taxable, l."taxAmount" * i."exchangeRate" tax
+            FROM "SalesInvoiceLine" l JOIN "SalesInvoice" i ON i.id = l."invoiceId" WHERE i.status IN ('POSTED','PARTIALLY_PAID','PAID') ${range(p, "i.date")}
+          UNION ALL
+          SELECT 'Output (sales)', l."taxRate", -l."lineTotal" * n."exchangeRate", -l."taxAmount" * n."exchangeRate"
+            FROM "CreditNoteLine" l JOIN "CreditNote" n ON n.id = l."creditNoteId" WHERE n.status = 'POSTED' ${range(p, "n.date")}
+          UNION ALL
+          SELECT 'Input (purchases)', l."taxRate", l."lineTotal" * i."exchangeRate", l."taxAmount" * i."exchangeRate"
+            FROM "PurchaseInvoiceLine" l JOIN "PurchaseInvoice" i ON i.id = l."invoiceId" WHERE i.status IN ('POSTED','PARTIALLY_PAID','PAID') ${range(p, "i.date")}
+          UNION ALL
+          SELECT 'Input (purchases)', l."taxRate", -l."lineTotal" * n."exchangeRate", -l."taxAmount" * n."exchangeRate"
+            FROM "DebitNoteLine" l JOIN "DebitNote" n ON n.id = l."debitNoteId" WHERE n.status = 'POSTED' ${range(p, "n.date")})
+        SELECT dir AS direction, rate::float, SUM(taxable)::float taxable, SUM(tax)::float tax FROM t GROUP BY 1, 2 ORDER BY 1 DESC, 2`;
+      return {
+        columns: [{ key: "direction", label: "Direction" }, { key: "rate", label: "Rate %", type: "pct" }, { key: "taxable", label: "Taxable amount (QAR)", type: "money" }, { key: "tax", label: "Tax (QAR)", type: "money" }],
+        rows, note: "Withholding tax deducted from supplier payments is in the Withholding tax payable account (general ledger).",
+      };
     },
   },
   {

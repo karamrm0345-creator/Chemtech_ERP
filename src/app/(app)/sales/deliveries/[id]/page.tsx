@@ -3,7 +3,7 @@ import { JournalPanel } from "@/components/journal-panel";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
-import { PageHeader, StatusBadge, Notice, Card } from "@/components/ui/primitives";
+import { PageHeader, StatusBadge, Notice, Card, LinkButton } from "@/components/ui/primitives";
 import { CommercialDocument } from "@/components/document";
 import { DataTable } from "@/components/ui/data-table";
 import { AttachmentsPanel, HistoryPanel } from "@/components/panels";
@@ -34,6 +34,7 @@ export default async function DeliveryPage({ params }: { params: Promise<{ id: s
         actions={<>
           {d.status === "DRAFT" && user.permissions.has("sales.delivery.post") && <ActionButton variant="action" label="Post delivery (issue stock)" confirm="Stock will be issued from the warehouse and the sales order updated. This cannot be edited afterwards. Continue?" action={postDeliveryAction.bind(null, id)} />}
           {d.status === "DRAFT" && user.permissions.has("sales.delivery.manage") && <ActionButton variant="danger" label="Cancel" confirm="Cancel this draft delivery?" action={cancelDeliveryAction.bind(null, id)} />}
+          {d.status === "POSTED" && user.permissions.has("sales.return.manage") && d.lines.some((l) => Number(l.returnedQty) < Number(l.quantity)) && <LinkButton variant="outline" href={`/sales/returns/new?deliveryId=${id}`}>Customer return</LinkButton>}
           <PrintButton label="Print delivery note" />
         </>} />
       {d.status === "POSTED" && <div className="mb-4"><Notice tone="success">Posted {fmtDateTime(d.postedAt)} by {poster?.name}. Stock issued from {wh?.code}.</Notice></div>}

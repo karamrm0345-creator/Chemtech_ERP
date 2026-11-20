@@ -41,6 +41,7 @@ export function SupplierForm({ id, initial, currencies, canBank }: { id: string 
         <Field label="Currency"><Select value={s.currency || "QAR"} onChange={(v) => setS({ ...s, currency: v })} options={currencies.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Payment terms"><input className="input" {...b("paymentTerms")} /></Field>
         <Field label="Payment term (days)"><input type="number" className="input" {...b("paymentTermDays")} /></Field>
+        <Field label="Withholding tax on payments (%)" hint="e.g. 5 for non-resident service providers; 0 if none"><input inputMode="decimal" className="input" {...b("withholdingRate")} /></Field>
         <Field label="Performance rating (0–5)"><input inputMode="decimal" className="input" {...b("rating")} /></Field>
         <Field label="Products & services supplied" className="sm:col-span-2 lg:col-span-3"><textarea className="input" rows={2} {...b("productsServices")} /></Field>
         <Field label="Notes" className="sm:col-span-2 lg:col-span-3"><textarea className="input" rows={2} {...b("notes")} /></Field>

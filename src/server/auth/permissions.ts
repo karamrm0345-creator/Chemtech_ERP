@@ -28,6 +28,7 @@ export const PERMISSION_GROUPS = {
     "sales.reserve": "Reserve / release stock for orders",
     "sales.delivery.manage": "Prepare delivery orders",
     "sales.delivery.post": "Post delivery orders (issue stock)",
+    "sales.return.manage": "Receive goods returned by customers",
   },
   Procurement: {
     "purchase.view": "View procurement documents",
@@ -95,7 +96,7 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
     code: "SALES_MANAGER", name: "Sales Manager", description: "Manages and approves sales",
     permissions: [...view, "dashboard.executive", "customer.manage", "sales.quotation.manage", "sales.quotation.approve",
       "sales.order.manage", "sales.order.approve", "sales.reserve", "sales.delivery.manage", "purchase.request.manage",
-      "reports.export", "attachment.upload", "finance.view"],
+      "reports.export", "attachment.upload", "finance.view", "sales.return.manage"],
   },
   {
     code: "SALES_OFFICER", name: "Sales Officer", description: "Prepares quotations and orders",
@@ -117,13 +118,13 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
     code: "STORE_MANAGER", name: "Store Manager", description: "Controls warehouses and approves adjustments",
     permissions: [...view, "item.manage", "inventory.adjust", "inventory.adjust.approve", "inventory.transfer", "inventory.issue",
       "inventory.count", "purchase.receipt.manage", "purchase.receipt.post", "purchase.return.manage", "sales.delivery.manage",
-      "sales.delivery.post", "sales.reserve", "purchase.request.manage", "reports.export", "attachment.upload"],
+      "sales.delivery.post", "sales.reserve", "purchase.request.manage", "reports.export", "attachment.upload", "sales.return.manage"],
   },
   {
     code: "STOREKEEPER", name: "Storekeeper", description: "Records receipts, issues and counts",
     permissions: ["item.view", "inventory.view", "purchase.view", "sales.view", "inventory.adjust", "inventory.transfer",
       "inventory.issue", "inventory.count", "purchase.receipt.manage", "purchase.receipt.post", "sales.delivery.manage",
-      "sales.delivery.post", "attachment.upload"],
+      "sales.delivery.post", "attachment.upload", "sales.return.manage"],
   },
   {
     code: "FINANCE_OFFICER", name: "Finance Officer", description: "Invoices, receipts and supplier payments",
@@ -148,4 +149,5 @@ export const DEFAULT_ROLES: { code: string; name: string; description: string; p
  */
 export const PERMISSION_UPGRADES: { version: number; permissions: Permission[] }[] = [
   { version: 1, permissions: ["accounting.view", "accounting.journal.manage", "accounting.journal.post", "accounting.coa.manage", "accounting.period.close"] },
+  { version: 2, permissions: ["sales.return.manage"] },
 ];

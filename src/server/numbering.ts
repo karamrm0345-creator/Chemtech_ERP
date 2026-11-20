@@ -21,6 +21,9 @@ export const DOC_TYPES = {
   STOCK_DOCUMENT: { prefix: "STK", includeYear: true, padding: 5 },
   STOCK_COUNT: { prefix: "CNT", includeYear: true, padding: 5 },
   JOURNAL_ENTRY: { prefix: "JV", includeYear: true, padding: 5 },
+  CREDIT_NOTE: { prefix: "CN", includeYear: true, padding: 5 },
+  DEBIT_NOTE: { prefix: "DN", includeYear: true, padding: 5 },
+  CUSTOMER_RETURN: { prefix: "SRT", includeYear: true, padding: 5 },
 } as const;
 
 export type DocType = keyof typeof DOC_TYPES;

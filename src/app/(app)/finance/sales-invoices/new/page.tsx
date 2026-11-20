@@ -5,6 +5,7 @@ import { invoiceableLines } from "@/server/services/finance";
 import { PageHeader, Notice } from "@/components/ui/primitives";
 import { toDateInput } from "@/lib/format";
 import { InvoiceForm } from "./form";
+import { costCenterOptions } from "@/app/(app)/accounting/journals/accounts";
 
 export const metadata = { title: "New sales invoice" };
 
@@ -21,7 +22,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
     <>
       <PageHeader title={`Invoice ${so.number}`} subtitle={so.customer.legalName} crumbs={[{ label: "Sales orders", href: "/sales/orders" }, { label: so.number, href: `/sales/orders/${so.id}` }, { label: "Invoice" }]} />
       {lines.length === 0 ? <Notice>Nothing is invoiceable yet. Stocked items must be delivered before they can be invoiced, and lines already invoiced (or on draft invoices) are excluded.</Notice>
-        : <InvoiceForm salesOrderId={so.id} currency={so.currency} lines={lines} date={toDateInput(new Date())} />}
+        : <InvoiceForm salesOrderId={so.id} currency={so.currency} lines={lines} date={toDateInput(new Date())} costCenters={await costCenterOptions()} />}
     </>
   );
 }

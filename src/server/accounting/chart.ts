@@ -23,6 +23,8 @@ export const POSTING_KEYS = {
   OPENING_BALANCE: "Opening balance equity",
   RETAINED_EARNINGS: "Retained earnings (fiscal year close)",
   ROUNDING: "Rounding differences",
+  EXCHANGE_DIFF: "Realised exchange differences",
+  WHT_PAYABLE: "Withholding tax payable",
 } as const;
 
 export type PostingKey = keyof typeof POSTING_KEYS;
@@ -49,6 +51,7 @@ export const STANDARD_CHART: Row[] = [
   { code: "2130", name: "Output tax payable", type: "LIABILITY", parent: "2100", key: "TAX_OUTPUT" },
   { code: "2140", name: "Accrued expenses", type: "LIABILITY", parent: "2100" },
   { code: "2150", name: "Customer advances", type: "LIABILITY", parent: "2100" },
+  { code: "2160", name: "Withholding tax payable", type: "LIABILITY", parent: "2100", key: "WHT_PAYABLE" },
   { code: "2200", name: "Non-current liabilities", type: "LIABILITY", parent: "2000", group: true },
   { code: "2210", name: "End of service benefits", type: "LIABILITY", parent: "2200" },
   { code: "3000", name: "Equity", type: "EQUITY", group: true },
@@ -71,6 +74,6 @@ export const STANDARD_CHART: Row[] = [
   { code: "6400", name: "Internal stock consumption", type: "EXPENSE", parent: "6000", key: "STOCK_CONSUMPTION" },
   { code: "6500", name: "Depreciation", type: "EXPENSE", parent: "6000" },
   { code: "6900", name: "Bank charges", type: "EXPENSE", parent: "6000" },
-  { code: "6950", name: "Exchange differences", type: "EXPENSE", parent: "6000" },
+  { code: "6950", name: "Exchange differences", type: "EXPENSE", parent: "6000", key: "EXCHANGE_DIFF" },
   { code: "6990", name: "Rounding differences", type: "EXPENSE", parent: "6000", key: "ROUNDING" },
 ];

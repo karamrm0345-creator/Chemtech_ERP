@@ -39,3 +39,9 @@ export async function reopenFiscalYearAction(id: string, reason?: string) {
 export async function setBooksLockAction(data: Record<string, string>) {
   return runAction((u) => A.setBooksLock(u, parseBusinessDate(data.date)), { revalidate: R, message: data.date ? "Books locked" : "Lock date cleared" });
 }
+export async function saveCostCenterAction(id: string | null, data: Record<string, string>) {
+  return runAction((u) => A.saveCostCenter(u, id, { ...data, active: data.active === undefined ? true : boolField(data.active) }), { revalidate: R, message: "Cost centre saved" });
+}
+export async function saveTaxCodeAction(id: string | null, data: Record<string, string>) {
+  return runAction((u) => A.saveTaxCode(u, id, { ...data, active: data.active === undefined ? true : boolField(data.active) }), { revalidate: R, message: "Tax code saved" });
+}

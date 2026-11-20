@@ -38,13 +38,21 @@ receipt) and purchase cycle (receipt at landed cost, supplier invoice clearing G
 inventory account equal to the stock ledger through transfers, adjustments and reversals; customer and supplier statements
 netting to zero; balanced trial balance and balance sheet; manual journals (balance check, separation of duties, group
 accounts refused, reversal); accounting permissions; books lock date; fiscal-year close into retained earnings and reopen;
-and a backfill + reconciliation of the whole database (ledger = stock ledger, receivables and payables = open invoices).
+and a backfill + reconciliation of the whole database (ledger = stock ledger, receivables and payables = open invoices less
+unallocated credits).
+
+Accounting phase 2 (`tests/accounting-phase2.test.ts`): one receipt settling two invoices with the surplus held on account and
+allocated later (over-allocation and wrong-customer allocation refused); realised exchange difference on a USD invoice paid at
+another rate; supplier payment with 5 % withholding tax; customer return at issue cost limiting invoicing, credit note against
+the invoice (quantity and price limits, double posting refused), credit left on account and applied to another invoice; debit
+note for a purchase return clearing GRNI with the cost difference to variance; tax code accounts and cost-centre P&L; and the
+reconciliation and new aging / tax reports.
 
 ### Latest result
 
 ```
- Test Files  8 passed (8)
-      Tests  55 passed (55)
+ Test Files  9 passed (9)
+      Tests  62 passed (62)
 ```
 
 (run on 2026-11-20, PostgreSQL 16, Node 22)
@@ -81,11 +89,10 @@ inspected. The sidebar collapses into a drawer, KPI cards and charts stack, and 
 
 | Run | Result |
 |---|---|
-| Page crawl: General Manager | 119 pages, 0 problems (pages outside the role correctly refused) |
-| Page crawl: Finance Officer | 119 pages, 0 problems |
-| Page crawl: Read-Only Auditor | 119 pages, 0 problems |
-| Page crawl: Storekeeper | 119 pages, 0 problems (accounting refused) |
+| Page crawl: General Manager, Finance Officer, Read-Only Auditor, Storekeeper, Sales Officer | 141 pages each, 0 problems (pages outside each role correctly refused) |
 | Manual journal prepared by Finance, posted by GM; statements reviewed | passed |
+| Receipt allocated oldest-first with advance; supplier payment with 5 % withholding; credit note; debit note; customer return; cost centre; aging and tax reports | passed |
+| Playwright e2e (sales workflow, access control) | 2 passed |
 | `npm run build` / `tsc --noEmit` / `eslint` | clean |
 
 ## Earlier browser results (2026-10-17, demo data)
